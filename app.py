@@ -1,7 +1,15 @@
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, Response
+from flask_cors import CORS
+import json
+import os
+import time
 
 app = Flask(__name__)
+CORS(app)
 
+# -----------------------------
+# Tool registry
+# -----------------------------
 TOOLS = [
     {
         "name": "ping",
@@ -14,75 +22,105 @@ TOOLS = [
     }
 ]
 
-def add_cors(resp):
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
-    resp.headers["Access-Control-Max-Age"] = "86400"
-    return resp
+def call_tool(name: str, arguments: dict):
+    if name == "ping":
+        return {
+            "content": [
+                {"type": "text", "text": "pong ✅"}
+            ]
+        }
+    return {
+        "content": [
+            {"type": "text", "text": f"Unknown tool: {name}"}
+        ]
+    }
 
-@app.route("/", methods=["GET"])
+# -----------------------------
+# Basic health
+# -----------------------------
+@app.get("/")
 def root():
-    resp = jsonify({
+    return jsonify({
         "message": "IDA MCP Gateway alive ✅",
         "service": "ida-mcp-gateway",
         "tools_loaded": len(TOOLS),
-        "version": "1.0.0"
+        "version": "1.1.0"
     })
-    return add_cors(resp)
 
-@app.route("/health", methods=["GET"])
-def health():
-    resp = jsonify({"ok": True, "tools_loaded": len(TOOLS)})
-    return add_cors(resp)
-
-@app.route("/mcp", methods=["GET", "POST", "OPTIONS"])
-def mcp():
-    # Preflight
-    if request.method == "OPTIONS":
-        return add_cors(make_response("", 204))
-
-    # Tool discovery
+# -----------------------------
+# MCP over HTTP (JSON-RPC)
+# -----------------------------
+@app.route("/mcp", methods=["GET", "POST"])
+def mcp_http():
+    # Some clients do a GET to discover tools (non-standard but common)
     if request.method == "GET":
-        resp = jsonify({"tools": TOOLS})
-        return add_cors(resp)
+        return jsonify({"tools": TOOLS})
 
-    # JSON-RPC tool calling
     payload = request.get_json(silent=True) or {}
-    rpc_id = payload.get("id")
     method = payload.get("method")
     params = payload.get("params") or {}
+    rpc_id = payload.get("id")
+
+    # MCP init handshake (clients may call initialize first)
+    if method == "initialize":
+        return jsonify({
+            "jsonrpc": "2.0",
+            "id": rpc_id,
+            "result": {
+                "protocolVersion": "2024-11-05",
+                "capabilities": {
+                    "tools": {}
+                },
+                "serverInfo": {
+                    "name": "ida-mcp-gateway",
+                    "version": "1.1.0"
+                }
+            }
+        })
 
     if method == "tools/list":
-        resp = jsonify({"jsonrpc": "2.0", "id": rpc_id, "result": {"tools": TOOLS}})
-        return add_cors(resp)
+        return jsonify({
+            "jsonrpc": "2.0",
+            "id": rpc_id,
+            "result": {
+                "tools": TOOLS
+            }
+        })
 
     if method == "tools/call":
         name = params.get("name")
         arguments = params.get("arguments") or {}
-
-        if name == "ping":
-            result = {"content": [{"type": "text", "text": "pong ✅"}]}
-            resp = jsonify({"jsonrpc": "2.0", "id": rpc_id, "result": result})
-            return add_cors(resp)
-
-        resp = jsonify({
+        result = call_tool(name, arguments)
+        return jsonify({
             "jsonrpc": "2.0",
             "id": rpc_id,
-            "error": {"code": -32601, "message": f"Unknown tool: {name}"}
+            "result": result
         })
-        return add_cors(resp), 200
 
-    # Fallback for unknown methods
-    resp = jsonify({
+    # fallback
+    return jsonify({
         "jsonrpc": "2.0",
         "id": rpc_id,
-        "error": {"code": -32601, "message": f"Method not found: {method}"}
+        "error": {
+            "code": -32601,
+            "message": f"Method not found: {method}"
+        }
     })
-    return add_cors(resp), 200
+
+# -----------------------------
+# MCP over SSE (for clients that require streaming)
+# -----------------------------
+@app.get("/mcp/sse")
+def mcp_sse():
+    def stream():
+        # Minimal SSE "hello" + periodic keepalive
+        yield "event: ready\ndata: {\"status\":\"ok\"}\n\n"
+        while True:
+            yield "event: ping\ndata: {\"t\":%d}\n\n" % int(time.time())
+            time.sleep(15)
+
+    return Response(stream(), mimetype="text/event-stream")
 
 if __name__ == "__main__":
-    # Render uses PORT env var; fallback to 10000 for local
-    import os
     port = int(os.environ.get("PORT", "10000"))
     app.run(host="0.0.0.0", port=port)
