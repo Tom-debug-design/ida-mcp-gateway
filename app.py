@@ -2,107 +2,87 @@ from flask import Flask, request, jsonify, make_response
 
 app = Flask(__name__)
 
-# ---------------------------
-# TOOL REGISTRY (keep simple)
-# ---------------------------
 TOOLS = [
     {
         "name": "ping",
         "description": "Health check to verify MCP connectivity",
-        # Builder/clients varierer litt på key-navn, så vi gir begge:
-        "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
-        "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False
+        }
     }
 ]
 
-# ---------------------------
-# CORS (THIS IS THE USUAL CULPRIT)
-# ---------------------------
-@app.after_request
-def add_cors_headers(resp):
+def add_cors(resp):
     resp.headers["Access-Control-Allow-Origin"] = "*"
     resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
-    resp.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
     resp.headers["Access-Control-Max-Age"] = "86400"
     return resp
 
-def ok_no_content():
-    return ("", 204)
-
-# ---------------------------
-# TOOL EXECUTION
-# ---------------------------
-def call_tool(name: str, arguments: dict):
-    if name == "ping":
-        return {"content": [{"type": "text", "text": "pong 🟢 MCP alive"}]}
-    return {"content": [{"type": "text", "text": f"Unknown tool: {name}"}]}
-
-# ---------------------------
-# ROOT HEALTH
-# ---------------------------
-@app.get("/")
+@app.route("/", methods=["GET"])
 def root():
-    return jsonify({
+    resp = jsonify({
         "message": "IDA MCP Gateway alive ✅",
         "service": "ida-mcp-gateway",
         "tools_loaded": len(TOOLS),
         "version": "1.0.0"
     })
+    return add_cors(resp)
 
-# ---------------------------
-# DISCOVERY (some clients use this)
-# ---------------------------
-@app.route("/.well-known/mcp.json", methods=["GET", "OPTIONS"])
-def well_known_mcp():
-    if request.method == "OPTIONS":
-        return ok_no_content()
-    return jsonify({"tools": TOOLS})
+@app.route("/health", methods=["GET"])
+def health():
+    resp = jsonify({"ok": True, "tools_loaded": len(TOOLS)})
+    return add_cors(resp)
 
 @app.route("/mcp", methods=["GET", "POST", "OPTIONS"])
 def mcp():
     # Preflight
     if request.method == "OPTIONS":
-        return ok_no_content()
+        return add_cors(make_response("", 204))
 
-    # Discovery via GET
+    # Tool discovery
     if request.method == "GET":
-        return jsonify({"tools": TOOLS})
+        resp = jsonify({"tools": TOOLS})
+        return add_cors(resp)
 
-    # JSON-RPC via POST
-    payload = request.get_json(force=True, silent=True) or {}
+    # JSON-RPC tool calling
+    payload = request.get_json(silent=True) or {}
     rpc_id = payload.get("id")
     method = payload.get("method")
+    params = payload.get("params") or {}
 
-    # tools/list
-    if method in ("tools/list", "list_tools"):
-        return jsonify({
-            "jsonrpc": "2.0",
-            "id": rpc_id,
-            "result": {"tools": TOOLS}
-        })
+    if method == "tools/list":
+        resp = jsonify({"jsonrpc": "2.0", "id": rpc_id, "result": {"tools": TOOLS}})
+        return add_cors(resp)
 
-    # tools/call
-    if method in ("tools/call", "call_tool"):
-        params = payload.get("params") or {}
+    if method == "tools/call":
         name = params.get("name")
         arguments = params.get("arguments") or {}
-        result = call_tool(name, arguments)
 
-        return jsonify({
+        if name == "ping":
+            result = {"content": [{"type": "text", "text": "pong ✅"}]}
+            resp = jsonify({"jsonrpc": "2.0", "id": rpc_id, "result": result})
+            return add_cors(resp)
+
+        resp = jsonify({
             "jsonrpc": "2.0",
             "id": rpc_id,
-            "result": result
+            "error": {"code": -32601, "message": f"Unknown tool: {name}"}
         })
+        return add_cors(resp), 200
 
-    # Fallback
-    return jsonify({
+    # Fallback for unknown methods
+    resp = jsonify({
         "jsonrpc": "2.0",
         "id": rpc_id,
         "error": {"code": -32601, "message": f"Method not found: {method}"}
     })
+    return add_cors(resp), 200
 
-# ---------------------------
-# BOOT
-# ---------------------------
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000)
+    # Render uses PORT env var; fallback to 10000 for local
+    import os
+    port = int(os.environ.get("PORT", "10000"))
+    app.run(host="0.0.0.0", port=port)
