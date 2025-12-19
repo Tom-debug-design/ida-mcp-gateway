@@ -1,16 +1,16 @@
-TOOL = {
-    "name": "ping",
+TOOL_NAME = "ping"
+
+TOOL_SPEC = {
     "description": "Health check to verify MCP connectivity",
-    "inputSchema": {
+    "input_schema": {
         "type": "object",
         "properties": {},
         "additionalProperties": False
-    }
+    },
 }
 
-def call(args: dict) -> dict:
+def run(args: dict) -> dict:
     return {
-        "content": [
-            {"type": "text", "text": "pong ✅ (from ida-mcp-gateway)"}
-        ]
+        "ok": True,
+        "message": "pong ✅ (from ida-mcp-gateway)"
     }
