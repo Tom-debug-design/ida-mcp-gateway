@@ -1,162 +1,133 @@
-import os
-import glob
-import importlib.util
-from typing import Dict, Any, Callable, Tuple, Optional
-
-from flask import Flask, jsonify, request
-from flask_cors import CORS
-
-APP_NAME = "ida-mcp-gateway"
-APP_VERSION = "1.0.0"
+from flask import Flask, request, jsonify
+import importlib
+import pkgutil
 
 app = Flask(__name__)
-CORS(app)
 
-# ----------------------------
-# Tool loading (AUTO)
-# ----------------------------
-ToolSpec = Dict[str, Any]
-ToolCallFn = Callable[[Dict[str, Any]], Dict[str, Any]]
+TOOLS = {}         # name -> module
+TOOL_SPECS = []    # list of {"name","description","inputSchema"}
 
-TOOLS: Dict[str, ToolSpec] = {}     # name -> spec (name, description, inputSchema)
-TOOL_CALLS: Dict[str, ToolCallFn] = {}  # name -> callable(args)->result
 
-def load_tools_from_folder(folder: str = "tools") -> Tuple[int, int]:
-    """
-    Loads tools from ./tools/*.py.
-    Each tool file must export:
-      - TOOL (dict): {"name": str, "description": str, "inputSchema": {...}}
-      - call(args: dict) -> dict  (returns MCP 'content' or your own structure)
-    """
-    loaded = 0
-    failed = 0
+def load_tools():
+    global TOOLS, TOOL_SPECS
+    TOOLS = {}
+    TOOL_SPECS = []
 
-    if not os.path.isdir(folder):
-        return (0, 0)
+    # Auto-discover: ida_mcp_gateway/tools/*.py  (eller bare tools/*.py)
+    # Vi prøver begge for å være robust uten mer drama.
+    candidates = ["tools", "ida_mcp_gateway.tools"]
 
-    for path in sorted(glob.glob(os.path.join(folder, "*.py"))):
-        filename = os.path.basename(path)
-        if filename.startswith("_"):
+    for pkg_name in candidates:
+        try:
+            pkg = importlib.import_module(pkg_name)
+        except Exception:
             continue
 
-        module_name = f"tool_{os.path.splitext(filename)[0]}"
-
-        try:
-            spec = importlib.util.spec_from_file_location(module_name, path)
-            if not spec or not spec.loader:
-                failed += 1
+        for m in pkgutil.iter_modules(pkg.__path__):
+            if m.ispkg:
+                continue
+            mod_name = f"{pkg_name}.{m.name}"
+            try:
+                mod = importlib.import_module(mod_name)
+            except Exception:
                 continue
 
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)  # type: ignore
+            # Støtter begge varianter:
+            # A) TOOL = {"name","description","inputSchema"} + call(args)
+            # B) TOOL_NAME + TOOL_SPEC + run(args)
+            name = None
+            spec = None
+            runner = None
 
-            tool: Optional[dict] = getattr(module, "TOOL", None)
-            call_fn: Optional[Callable] = getattr(module, "call", None)
+            if hasattr(mod, "TOOL") and isinstance(getattr(mod, "TOOL"), dict):
+                spec = getattr(mod, "TOOL")
+                name = spec.get("name")
+                runner = getattr(mod, "call", None)
+            elif hasattr(mod, "TOOL_NAME") and hasattr(mod, "TOOL_SPEC"):
+                name = getattr(mod, "TOOL_NAME")
+                ts = getattr(mod, "TOOL_SPEC", {})
+                spec = {
+                    "name": name,
+                    "description": ts.get("description", ""),
+                    "inputSchema": ts.get("input_schema", {"type": "object", "properties": {}})
+                }
+                runner = getattr(mod, "run", None)
 
-            if not isinstance(tool, dict) or not callable(call_fn):
-                failed += 1
-                continue
+            if name and spec and callable(runner):
+                TOOLS[name] = mod
+                TOOL_SPECS.append({
+                    "name": spec.get("name", name),
+                    "description": spec.get("description", ""),
+                    "inputSchema": spec.get("inputSchema", {"type": "object", "properties": {}})
+                })
 
-            name = tool.get("name")
-            desc = tool.get("description", "")
-            schema = tool.get("inputSchema", {"type": "object", "properties": {}})
 
-            if not isinstance(name, str) or not name.strip():
-                failed += 1
-                continue
+load_tools()
 
-            TOOLS[name] = {
-                "name": name,
-                "description": desc,
-                "inputSchema": schema,
-            }
-            TOOL_CALLS[name] = call_fn
-            loaded += 1
 
-        except Exception:
-            failed += 1
-
-    return (loaded, failed)
-
-# Load tools at boot
-_loaded, _failed = load_tools_from_folder("tools")
-
-# ----------------------------
-# Basic endpoints
-# ----------------------------
 @app.get("/")
-def root():
+def health():
     return jsonify({
         "message": "IDA MCP Gateway alive ✅",
-        "service": APP_NAME,
-        "version": APP_VERSION,
-        "tools_loaded": len(TOOLS)
+        "service": "ida-mcp-gateway",
+        "tools_loaded": len(TOOLS),
+        "version": "1.0.0"
     })
 
-@app.get("/.well-known/mcp.json")
-def mcp_manifest():
-    host = request.host_url.rstrip("/")
-    # Minimal manifest-like info (Agent Builder may use /mcp directly anyway)
-    return jsonify({
-        "name": APP_NAME,
-        "version": APP_VERSION,
-        "description": "Custom MCP gateway for IDA (Render hosted)",
-        "transport": {"type": "http", "url": f"{host}/mcp"}
-    })
 
-# ----------------------------
-# MCP JSON-RPC over HTTP
-# Endpoint: POST /mcp
-# ----------------------------
 @app.post("/mcp")
-def mcp_http():
+def mcp_rpc():
     payload = request.get_json(silent=True) or {}
+    method = payload.get("method")
+    rpc_id = payload.get("id")
 
-    rpc_id = payload.get("id", None)
-    method = payload.get("method", "")
-    params = payload.get("params", {}) or {}
+    try:
+        if method == "tools/list":
+            return jsonify({
+                "jsonrpc": "2.0",
+                "id": rpc_id,
+                "result": {"tools": TOOL_SPECS}
+            })
 
-    def ok(result: Any):
-        return jsonify({"jsonrpc": "2.0", "id": rpc_id, "result": result})
+        if method == "tools/call":
+            params = payload.get("params") or {}
+            name = params.get("name")
+            arguments = params.get("arguments") or {}
 
-    def err(code: int, message: str):
-        # MCP/JSON-RPC clients often expect HTTP 200 even on errors
-        return jsonify({"jsonrpc": "2.0", "id": rpc_id, "error": {"code": code, "message": message}}), 200
+            mod = TOOLS.get(name)
+            if not mod:
+                raise ValueError(f"Unknown tool: {name}")
 
-    if method == "initialize":
-        return ok({
-            "protocolVersion": "2024-11-05",
-            "serverInfo": {"name": APP_NAME, "version": APP_VERSION},
-            "capabilities": {"tools": {"listChanged": False}}
-        })
+            # Kjør riktig runner (call eller run)
+            if hasattr(mod, "call") and callable(getattr(mod, "call")):
+                out = mod.call(arguments)
+            else:
+                out = mod.run(arguments)
 
-    if method == "tools/list":
-        return ok({"tools": list(TOOLS.values())})
+            # MCP forventer {"content":[...]}
+            if isinstance(out, dict) and "content" in out:
+                result = out
+            else:
+                # fallback hvis tool returnerer {"ok":True,"message":"..."}
+                msg = out.get("message") if isinstance(out, dict) else str(out)
+                result = {"content": [{"type": "text", "text": msg}]}
 
-    if method == "tools/call":
-        tool_name = params.get("name")
-        args = params.get("arguments", {}) or {}
+            return jsonify({"jsonrpc": "2.0", "id": rpc_id, "result": result})
 
-        if tool_name not in TOOL_CALLS:
-            return err(-32601, f"Unknown tool: {tool_name}")
+        # ukjent metode
+        return jsonify({
+            "jsonrpc": "2.0",
+            "id": rpc_id,
+            "error": {"code": -32601, "message": f"Method not found: {method}"}
+        }), 400
 
-        try:
-            result = TOOL_CALLS[tool_name](args)
+    except Exception as e:
+        return jsonify({
+            "jsonrpc": "2.0",
+            "id": rpc_id,
+            "error": {"code": -32000, "message": str(e)}
+        }), 500
 
-            # MCP expects something like: {"content":[{"type":"text","text":"..."}]}
-            # We'll normalize if the tool returns plain text.
-            if isinstance(result, str):
-                result = {"content": [{"type": "text", "text": result}]}
-            elif isinstance(result, dict) and "content" not in result:
-                # If tool returns dict without MCP content, wrap it.
-                result = {"content": [{"type": "text", "text": jsonify(result).get_data(as_text=True)}]}
-
-            return ok(result)
-        except Exception as e:
-            return err(-32000, f"Tool error: {str(e)}")
-
-    return err(-32601, f"Method not found: {method}")
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "8080"))
-    app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=10000)
