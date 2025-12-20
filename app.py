@@ -1,62 +1,44 @@
-from flask import Flask, request, jsonify, Response
-from flask_cors import CORS
 import os
-import time
-import json
 import base64
+import json
+from datetime import datetime
+
 import requests
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 
 app = Flask(__name__)
 CORS(app)
 
-# ----------------------------
-# Config
-# ----------------------------
+SERVICE_NAME = "ida-mcp-gateway"
+VERSION = "1.4.0"
+
+# ---- GitHub config ----
 GITHUB_API = "https://api.github.com"
-DEFAULT_BRANCH = os.getenv("GITHUB_BRANCH", "main")
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN") or os.getenv("GH_TOKEN") or os.getenv("AGENT_TOKEN")
 
-def get_github_token() -> str | None:
-    # Prioritet: GITHUB_TOKEN -> IDA_MASTER_GITHUB -> GITHUB_PAT
-    return (
-        os.getenv("GITHUB_TOKEN")
-        or os.getenv("IDA_MASTER_GITHUB")
-        or os.getenv("GITHUB_PAT")
-    )
+DEFAULT_REPO = os.getenv("DEFAULT_REPO", "").strip()  # optional: "owner/repo"
+DEFAULT_BRANCH = os.getenv("DEFAULT_BRANCH", "main").strip()
 
-def gh_headers(token: str) -> dict:
-    return {
-        "Authorization": f"Bearer {token}",
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "ida-mcp-gateway",
-    }
 
-def err_result(message: str):
-    return {
-        "content": [{"type": "text", "text": f"❌ {message}"}]
-    }
-
-def ok_text(message: str):
-    return {
-        "content": [{"type": "text", "text": message}]
-    }
-
-# ----------------------------
-# MCP Tool Registry (REAL tools)
-# ----------------------------
+# -----------------------------
+# MCP-ish tool registry
+# -----------------------------
 TOOLS = [
     {
         "name": "github_read_file",
-        "description": "Read a file from a GitHub repo (returns decoded text content when possible).",
+        "description": "Read a file from a GitHub repo (returns raw text).",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "repo": {"type": "string", "description": "owner/repo"},
-                "path": {"type": "string", "description": "path in repo"},
-                "ref": {"type": "string", "description": "branch/tag/sha (optional)"},
+                "repo": {"type": "string", "description": "owner/repo (optional if DEFAULT_REPO set)"},
+                "path": {"type": "string", "description": "path in repo, e.g. README.md"},
+                "ref": {"type": "string", "description": "branch/tag/sha (optional, defaults to DEFAULT_BRANCH)"}
             },
-            "required": ["repo", "path"],
-            "additionalProperties": False,
-        },
+            # IMPORTANT: keep required empty -> avoids builder red triangle
+            "required": [],
+            "additionalProperties": False
+        }
     },
     {
         "name": "github_write_file",
@@ -64,187 +46,200 @@ TOOLS = [
         "inputSchema": {
             "type": "object",
             "properties": {
-                "repo": {"type": "string", "description": "owner/repo"},
-                "path": {"type": "string", "description": "path in repo"},
-                "content": {"type": "string", "description": "raw text content to write"},
+                "repo": {"type": "string", "description": "owner/repo (optional if DEFAULT_REPO set)"},
+                "path": {"type": "string", "description": "path in repo, e.g. agent_outbox/bridge_test.txt"},
+                "content": {"type": "string", "description": "file content (utf-8 string)"},
                 "message": {"type": "string", "description": "commit message"},
-                "branch": {"type": "string", "description": "branch (optional, default main)"},
+                "branch": {"type": "string", "description": "branch (optional, defaults to DEFAULT_BRANCH)"}
             },
-            "required": ["repo", "path", "content", "message"],
-            "additionalProperties": False,
-        },
+            # IMPORTANT: keep required empty -> avoids builder red triangle
+            "required": [],
+            "additionalProperties": False
+        }
     },
+    {
+        "name": "health_check",
+        "description": "Simple health check.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False
+        }
+    }
 ]
 
-# ----------------------------
-# Tool Implementations
-# ----------------------------
-def github_read_file(args: dict) -> dict:
-    token = get_github_token()
-    if not token:
-        return err_result("Missing GitHub token env var. Set GITHUB_TOKEN (recommended) or IDA_MASTER_GITHUB.")
 
-    repo = args.get("repo")
-    path = args.get("path")
-    ref = args.get("ref")
+# -----------------------------
+# Helpers
+# -----------------------------
+def _gh_headers():
+    if not GITHUB_TOKEN:
+        # No token -> we still expose tools, but calls will return a clear error
+        return {"Accept": "application/vnd.github+json"}
+    return {
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json"
+    }
+
+
+def _resolve_repo(repo: str | None) -> str:
+    repo = (repo or "").strip()
+    if repo:
+        return repo
+    if DEFAULT_REPO:
+        return DEFAULT_REPO
+    raise ValueError("Missing 'repo'. Set DEFAULT_REPO env or pass repo='owner/repo'.")
+
+
+def _resolve_ref(ref: str | None) -> str:
+    ref = (ref or "").strip()
+    return ref if ref else DEFAULT_BRANCH
+
+
+def _require_token():
+    if not GITHUB_TOKEN:
+        raise ValueError("Missing GitHub token. Set env GITHUB_TOKEN (or GH_TOKEN/AGENT_TOKEN).")
+
+
+# -----------------------------
+# Tool implementations
+# -----------------------------
+def tool_health_check(_args: dict):
+    return {
+        "ok": True,
+        "service": SERVICE_NAME,
+        "version": VERSION,
+        "time": datetime.utcnow().isoformat() + "Z",
+        "tools_loaded": len(TOOLS)
+    }
+
+
+def tool_github_read_file(args: dict):
+    _require_token()
+    repo = _resolve_repo(args.get("repo"))
+    path = (args.get("path") or "").strip()
+    ref = _resolve_ref(args.get("ref"))
+
+    if not path:
+        raise ValueError("Missing 'path' (e.g. README.md).")
 
     url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
-    params = {}
-    if ref:
-        params["ref"] = ref
-
-    r = requests.get(url, headers=gh_headers(token), params=params, timeout=20)
-    if r.status_code != 200:
-        return err_result(f"GitHub read failed ({r.status_code}): {r.text}")
+    r = requests.get(url, headers=_gh_headers(), params={"ref": ref}, timeout=30)
+    if r.status_code >= 400:
+        raise ValueError(f"GitHub read failed ({r.status_code}): {r.text}")
 
     data = r.json()
-    # If it's a file, GitHub returns base64 content
-    if data.get("type") != "file":
-        return err_result("Path is not a file.")
+    if isinstance(data, dict) and data.get("type") == "file":
+        content_b64 = data.get("content", "")
+        decoded = base64.b64decode(content_b64).decode("utf-8", errors="replace")
+        return {
+            "repo": repo,
+            "path": path,
+            "ref": ref,
+            "sha": data.get("sha"),
+            "text": decoded
+        }
 
-    b64 = data.get("content", "")
-    encoding = data.get("encoding")
-    if encoding == "base64" and b64:
-        try:
-            raw = base64.b64decode(b64).decode("utf-8", errors="replace")
-        except Exception:
-            raw = base64.b64decode(b64).decode("latin-1", errors="replace")
-        return ok_text(raw)
+    # If it’s a directory or other type
+    return {
+        "repo": repo,
+        "path": path,
+        "ref": ref,
+        "data": data
+    }
 
-    return err_result("Could not decode content.")
 
-def github_write_file(args: dict) -> dict:
-    token = get_github_token()
-    if not token:
-        return err_result("Missing GitHub token env var. Set GITHUB_TOKEN (recommended) or IDA_MASTER_GITHUB.")
-
-    repo = args.get("repo")
-    path = args.get("path")
+def tool_github_write_file(args: dict):
+    _require_token()
+    repo = _resolve_repo(args.get("repo"))
+    path = (args.get("path") or "").strip()
     content = args.get("content", "")
-    message = args.get("message")
-    branch = args.get("branch") or DEFAULT_BRANCH
+    message = (args.get("message") or "").strip()
+    branch = _resolve_ref(args.get("branch"))
 
-    # 1) check if file exists -> get sha
+    if not path:
+        raise ValueError("Missing 'path' (e.g. agent_outbox/bridge_test.txt).")
+    if not message:
+        raise ValueError("Missing 'message' (commit message).")
+
     url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
-    params = {"ref": branch}
+
+    # Check if file exists -> get sha
     sha = None
+    get_r = requests.get(url, headers=_gh_headers(), params={"ref": branch}, timeout=30)
+    if get_r.status_code == 200:
+        sha = get_r.json().get("sha")
 
-    r_get = requests.get(url, headers=gh_headers(token), params=params, timeout=20)
-    if r_get.status_code == 200:
-        sha = r_get.json().get("sha")
-    elif r_get.status_code in (404,):
-        sha = None
-    else:
-        return err_result(f"GitHub pre-check failed ({r_get.status_code}): {r_get.text}")
-
-    # 2) PUT create/update
-    b64_content = base64.b64encode(content.encode("utf-8")).decode("utf-8")
     payload = {
         "message": message,
-        "content": b64_content,
-        "branch": branch,
+        "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
+        "branch": branch
     }
     if sha:
         payload["sha"] = sha
 
-    r_put = requests.put(url, headers=gh_headers(token), json=payload, timeout=20)
-    if r_put.status_code not in (200, 201):
-        return err_result(f"GitHub write failed ({r_put.status_code}): {r_put.text}")
+    put_r = requests.put(url, headers=_gh_headers(), json=payload, timeout=30)
+    if put_r.status_code >= 400:
+        raise ValueError(f"GitHub write failed ({put_r.status_code}): {put_r.text}")
 
-    out = r_put.json()
-    commit_sha = (out.get("commit") or {}).get("sha", "")
-    html_url = ((out.get("content") or {}).get("html_url")) or ""
+    out = put_r.json()
+    return {
+        "repo": repo,
+        "path": path,
+        "branch": branch,
+        "commit_sha": (out.get("commit") or {}).get("sha"),
+        "content_sha": (out.get("content") or {}).get("sha"),
+        "url": (out.get("content") or {}).get("html_url")
+    }
 
-    return ok_text(
-        "✅ GitHub write OK\n"
-        f"- repo: {repo}\n"
-        f"- path: {path}\n"
-        f"- branch: {branch}\n"
-        f"- commit: {commit_sha}\n"
-        f"- url: {html_url}"
-    )
 
-def call_tool(name: str, arguments: dict) -> dict:
-    if name == "github_read_file":
-        return github_read_file(arguments)
-    if name == "github_write_file":
-        return github_write_file(arguments)
-    return err_result(f"Unknown tool: {name}")
+TOOL_FUNCS = {
+    "health_check": tool_health_check,
+    "github_read_file": tool_github_read_file,
+    "github_write_file": tool_github_write_file,
+}
 
-# ----------------------------
-# Basic health
-# ----------------------------
+
+# -----------------------------
+# Routes
+# -----------------------------
 @app.get("/")
 def root():
     return jsonify({
-        "message": "IDA MCP Gateway alive ✅",
-        "service": "ida-mcp-gateway",
-        "tools_loaded": len(TOOLS),
-        "version": "2.0.0"
+        "message": f"IDA MCP Gateway alive ✅",
+        "service": SERVICE_NAME,
+        "version": VERSION,
+        "tools_loaded": len(TOOLS)
     })
 
-# ----------------------------
-# MCP over HTTP (JSON-RPC)
-# ----------------------------
-@app.route("/mcp", methods=["GET", "POST"])
-def mcp_http():
-    # Common non-standard discovery
-    if request.method == "GET":
-        return jsonify({"tools": TOOLS})
 
-    payload = request.get_json(silent=True) or {}
-    method = payload.get("method")
-    params = payload.get("params") or {}
-    rpc_id = payload.get("id")
+# Tool discovery (builder needs this)
+@app.get("/tools")
+@app.get("/mcp/tools")
+def list_tools():
+    return jsonify({"tools": TOOLS})
 
-    # "initialize" handshake (some clients call this first)
-    if method == "initialize":
-        return jsonify({
-            "jsonrpc": "2.0",
-            "id": rpc_id,
-            "result": {
-                "protocolVersion": "2024-11-05",
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": "ida-mcp-gateway", "version": "2.0.0"},
-            },
-        })
 
-    if method == "tools/list":
-        return jsonify({
-            "jsonrpc": "2.0",
-            "id": rpc_id,
-            "result": {"tools": TOOLS},
-        })
+# Tool execution (simple JSON contract)
+# Expected input: {"name":"github_write_file","arguments":{...}}
+@app.post("/call")
+@app.post("/mcp/call")
+def call_tool():
+    body = request.get_json(force=True, silent=True) or {}
+    name = (body.get("name") or "").strip()
+    args = body.get("arguments") or {}
 
-    if method == "tools/call":
-        tool_name = params.get("name")
-        arguments = params.get("arguments") or {}
-        result = call_tool(tool_name, arguments)
-        return jsonify({
-            "jsonrpc": "2.0",
-            "id": rpc_id,
-            "result": result,
-        })
+    if name not in TOOL_FUNCS:
+        return jsonify({"ok": False, "error": f"Unknown tool: {name}"}), 400
 
-    return jsonify({
-        "jsonrpc": "2.0",
-        "id": rpc_id,
-        "error": {"code": -32601, "message": f"Method not found: {method}"},
-    })
+    try:
+        result = TOOL_FUNCS[name](args)
+        return jsonify({"ok": True, "tool": name, "result": result})
+    except Exception as e:
+        return jsonify({"ok": False, "tool": name, "error": str(e)}), 400
 
-# ----------------------------
-# MCP over SSE (optional, for clients that require streaming)
-# ----------------------------
-@app.get("/mcp/sse")
-def mcp_sse():
-    def stream():
-        yield 'event: ready\ndata: {"status":"ok"}\n\n'
-        while True:
-            yield f'event: ping\ndata: {{"t":{int(time.time())}}}\n\n'
-            time.sleep(15)
-
-    return Response(stream(), mimetype="text/event-stream")
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", "10000"))
-    app.run(host="0.0.0.0", port=port)
+    port = int(os.getenv("PORT", "10000"))
+    app.run(host="0.0.0.0", port=port, debug=False)
