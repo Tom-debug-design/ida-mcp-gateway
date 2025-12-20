@@ -1,15 +1,14 @@
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
-import json
 import os
 import time
 
 app = Flask(__name__)
 CORS(app)
 
-# -----------------------------
-# Tool registry
-# -----------------------------
+# ----------------------------
+# Tool registry (what MCP sees)
+# ----------------------------
 TOOLS = [
     {
         "name": "ping",
@@ -19,37 +18,54 @@ TOOLS = [
             "properties": {},
             "additionalProperties": False
         }
+    },
+    {
+        "name": "github_whoami",
+        "description": "Verify GitHub token works by returning the authenticated user login",
+        "inputSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": False
+        }
     }
 ]
 
-def call_tool(name: str, arguments: dict):
+# ----------------------------
+# Tool execution router
+# ----------------------------
+def call_tool(name: str, arguments: dict) -> dict:
+    # Keep these imports inside to avoid import-time crashes if file missing
     if name == "ping":
-        return {
-            "content": [
-                {"type": "text", "text": "pong ✅"}
-            ]
-        }
-    return {
-        "content": [
-            {"type": "text", "text": f"Unknown tool: {name}"}
-        ]
-    }
+        try:
+            from tools.ping import run as ping_run
+            return ping_run(arguments or {})
+        except Exception as e:
+            return {"ok": False, "error": f"ping tool error: {str(e)}"}
 
-# -----------------------------
+    if name == "github_whoami":
+        try:
+            from tools.github_whoami import run as whoami_run
+            return whoami_run(arguments or {})
+        except Exception as e:
+            return {"ok": False, "error": f"github_whoami tool error: {str(e)}"}
+
+    return {"ok": False, "error": f"Unknown tool: {name}"}
+
+# ----------------------------
 # Basic health
-# -----------------------------
+# ----------------------------
 @app.get("/")
 def root():
     return jsonify({
         "message": "IDA MCP Gateway alive ✅",
         "service": "ida-mcp-gateway",
         "tools_loaded": len(TOOLS),
-        "version": "1.1.0"
+        "version": "1.2.0"
     })
 
-# -----------------------------
+# ----------------------------
 # MCP over HTTP (JSON-RPC)
-# -----------------------------
+# ----------------------------
 @app.route("/mcp", methods=["GET", "POST"])
 def mcp_http():
     # Some clients do a GET to discover tools (non-standard but common)
@@ -73,31 +89,31 @@ def mcp_http():
                 },
                 "serverInfo": {
                     "name": "ida-mcp-gateway",
-                    "version": "1.1.0"
+                    "version": "1.2.0"
                 }
             }
         })
 
+    # MCP tools/list
     if method == "tools/list":
         return jsonify({
             "jsonrpc": "2.0",
             "id": rpc_id,
-            "result": {
-                "tools": TOOLS
-            }
+            "result": {"tools": TOOLS}
         })
 
+    # MCP tools/call
     if method == "tools/call":
-        name = params.get("name")
+        tool_name = params.get("name")
         arguments = params.get("arguments") or {}
-        result = call_tool(name, arguments)
+        result = call_tool(tool_name, arguments)
         return jsonify({
             "jsonrpc": "2.0",
             "id": rpc_id,
             "result": result
         })
 
-    # fallback
+    # Fallback
     return jsonify({
         "jsonrpc": "2.0",
         "id": rpc_id,
@@ -107,19 +123,20 @@ def mcp_http():
         }
     })
 
-# -----------------------------
-# MCP over SSE (for clients that require streaming)
-# -----------------------------
+# ----------------------------
+# MCP over SSE (streaming keepalive)
+# ----------------------------
 @app.get("/mcp/sse")
 def mcp_sse():
     def stream():
-        # Minimal SSE "hello" + periodic keepalive
-        yield "event: ready\ndata: {\"status\":\"ok\"}\n\n"
+        # Minimal SSE "ready" + periodic keepalive
+        yield 'event: ready\ndata: {"status":"ok"}\n\n'
         while True:
-            yield "event: ping\ndata: {\"t\":%d}\n\n" % int(time.time())
+            yield f'event: ping\ndata: {{"t":{int(time.time())}}}\n\n'
             time.sleep(15)
 
     return Response(stream(), mimetype="text/event-stream")
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", "10000"))
