@@ -1,76 +1,122 @@
 from flask import Flask, request, jsonify, Response
 from flask_cors import CORS
+import importlib.util
 import os
 import time
+import traceback
+
+APP_VERSION = "1.3.0"
 
 app = Flask(__name__)
 CORS(app)
 
-# ----------------------------
-# Tool registry (what MCP sees)
-# ----------------------------
-TOOLS = [
-    {
-        "name": "ping",
-        "description": "Health check to verify MCP connectivity",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False
-        }
-    },
-    {
-        "name": "github_whoami",
-        "description": "Verify GitHub token works by returning the authenticated user login",
-        "inputSchema": {
-            "type": "object",
-            "properties": {},
-            "additionalProperties": False
-        }
-    }
-]
+# ---------------------------
+# Tool loader
+# ---------------------------
 
-# ----------------------------
-# Tool execution router
-# ----------------------------
-def call_tool(name: str, arguments: dict) -> dict:
-    # Keep these imports inside to avoid import-time crashes if file missing
-    if name == "ping":
+def load_tools(tools_dir: str = "tools"):
+    """
+    Auto-load MCP tools from tools/*.py
+    Each tool file must define:
+      - TOOL_SPEC: dict  (must include "name", "description", "inputSchema")
+      - run(args: dict) -> dict or list or str
+    """
+    loaded = {}
+    abs_dir = os.path.join(os.path.dirname(__file__), tools_dir)
+
+    if not os.path.isdir(abs_dir):
+        return loaded
+
+    for fname in os.listdir(abs_dir):
+        if not fname.endswith(".py"):
+            continue
+        if fname.startswith("_"):
+            continue
+
+        path = os.path.join(abs_dir, fname)
+        mod_name = f"{tools_dir}.{fname[:-3]}"
+
         try:
-            from tools.ping import run as ping_run
-            return ping_run(arguments or {})
-        except Exception as e:
-            return {"ok": False, "error": f"ping tool error: {str(e)}"}
+            spec = importlib.util.spec_from_file_location(mod_name, path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)  # type: ignore
 
-    if name == "github_whoami":
-        try:
-            from tools.github_whoami import run as whoami_run
-            return whoami_run(arguments or {})
-        except Exception as e:
-            return {"ok": False, "error": f"github_whoami tool error: {str(e)}"}
+            tool_spec = getattr(module, "TOOL_SPEC", None)
+            tool_run = getattr(module, "run", None)
 
-    return {"ok": False, "error": f"Unknown tool: {name}"}
+            if not isinstance(tool_spec, dict):
+                continue
+            if not callable(tool_run):
+                continue
+            if "name" not in tool_spec:
+                continue
 
-# ----------------------------
+            loaded[tool_spec["name"]] = {
+                "spec": tool_spec,
+                "run": tool_run,
+                "file": fname,
+            }
+        except Exception:
+            # Don't crash service if one tool is broken
+            print(f"[TOOL-LOAD-ERROR] {fname}\n{traceback.format_exc()}")
+
+    return loaded
+
+
+TOOLS_REGISTRY = load_tools("tools")
+
+
+def tools_list():
+    # MCP tools/list expects an array of tool specs
+    return [TOOLS_REGISTRY[name]["spec"] for name in sorted(TOOLS_REGISTRY.keys())]
+
+
+def call_tool(name: str, arguments: dict):
+    tool = TOOLS_REGISTRY.get(name)
+    if not tool:
+        return {
+            "content": [{"type": "text", "text": f"Unknown tool: {name}"}]
+        }
+
+    try:
+        result = tool["run"](arguments or {})
+        # Normalize result to MCP "content" format if it's not already
+        if isinstance(result, dict) and "content" in result:
+            return result
+
+        if isinstance(result, (dict, list)):
+            return {"content": [{"type": "text", "text": str(result)}]}
+
+        return {"content": [{"type": "text", "text": str(result)}]}
+    except Exception as e:
+        return {
+            "content": [{"type": "text", "text": f"Tool error: {name} -> {e}"}]
+        }
+
+
+# ---------------------------
 # Basic health
-# ----------------------------
+# ---------------------------
+
 @app.get("/")
 def root():
     return jsonify({
         "message": "IDA MCP Gateway alive ✅",
         "service": "ida-mcp-gateway",
-        "tools_loaded": len(TOOLS),
-        "version": "1.2.0"
+        "tools_loaded": len(TOOLS_REGISTRY),
+        "version": APP_VERSION
     })
 
-# ----------------------------
+
+# ---------------------------
 # MCP over HTTP (JSON-RPC)
-# ----------------------------
+# ---------------------------
+
 @app.route("/mcp", methods=["GET", "POST"])
 def mcp_http():
-    # Some clients do a GET to discover tools (non-standard but common)
+    # Non-standard but common: clients do GET to discover tools
     if request.method == "GET":
-        return jsonify({"tools": TOOLS})
+        return jsonify({"tools": tools_list()})
 
     payload = request.get_json(silent=True) or {}
     method = payload.get("method")
@@ -84,52 +130,44 @@ def mcp_http():
             "id": rpc_id,
             "result": {
                 "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "tools": {}
-                },
-                "serverInfo": {
-                    "name": "ida-mcp-gateway",
-                    "version": "1.2.0"
-                }
+                "capabilities": {"tools": {}},
+                "serverInfo": {"name": "ida-mcp-gateway", "version": APP_VERSION}
             }
         })
 
-    # MCP tools/list
     if method == "tools/list":
         return jsonify({
             "jsonrpc": "2.0",
             "id": rpc_id,
-            "result": {"tools": TOOLS}
+            "result": {"tools": tools_list()}
         })
 
-    # MCP tools/call
     if method == "tools/call":
-        tool_name = params.get("name")
+        name = params.get("name")
         arguments = params.get("arguments") or {}
-        result = call_tool(tool_name, arguments)
+        result = call_tool(name, arguments)
         return jsonify({
             "jsonrpc": "2.0",
             "id": rpc_id,
             "result": result
         })
 
-    # Fallback
+    # fallback
     return jsonify({
         "jsonrpc": "2.0",
         "id": rpc_id,
-        "error": {
-            "code": -32601,
-            "message": f"Method not found: {method}"
-        }
+        "error": {"code": -32601, "message": f"Method not found: {method}"}
     })
 
-# ----------------------------
-# MCP over SSE (streaming keepalive)
-# ----------------------------
+
+# ---------------------------
+# MCP over SSE (basic streaming keepalive)
+# ---------------------------
+
 @app.get("/mcp/sse")
 def mcp_sse():
     def stream():
-        # Minimal SSE "ready" + periodic keepalive
+        # minimal "ready" + periodic keepalive
         yield 'event: ready\ndata: {"status":"ok"}\n\n'
         while True:
             yield f'event: ping\ndata: {{"t":{int(time.time())}}}\n\n'
