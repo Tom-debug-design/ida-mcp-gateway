@@ -116,7 +116,7 @@ def root():
 def mcp_http():
     # Non-standard but common: clients do GET to discover tools
     if request.method == "GET":
-        return jsonify({"tools": tools_list()})
+        return jsonify(tools_list())
 
     payload = request.get_json(silent=True) or {}
     method = payload.get("method")
