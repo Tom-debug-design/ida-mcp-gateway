@@ -1,327 +1,254 @@
-# app.py
 import os
-import json
 import base64
-from datetime import datetime
-from typing import Any, Dict, Optional, Tuple
+import json
+from datetime import datetime, timezone
 
 import requests
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-APP_VERSION = os.getenv("APP_VERSION", "1.4.0")
-
-# === ENV ===
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
-DEFAULT_REPO = os.getenv("DEFAULT_REPO", "").strip()          # "owner/repo"
-DEFAULT_BRANCH = os.getenv("DEFAULT_BRANCH", "main").strip()
-GITHUB_API_BASE = os.getenv("GITHUB_API_BASE", "https://api.github.com").strip()
-
-# === Flask ===
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app)
 
-session = requests.Session()
-if GITHUB_TOKEN:
-    session.headers.update({
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
-        "Accept": "application/vnd.github+json",
-        "User-Agent": "ida-mcp-gateway",
-        "X-GitHub-Api-Version": "2022-11-28",
-    })
+# ---------- Config ----------
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
+DEFAULT_REPO = os.getenv("DEFAULT_REPO", "").strip()  # e.g. "Tom-debug-design/atomicbot-agent"
+DEFAULT_BRANCH = os.getenv("DEFAULT_BRANCH", "main").strip()
+SERVICE_NAME = os.getenv("SERVICE_NAME", "ida-mcp-gateway").strip()
+VERSION = os.getenv("VERSION", "1.4.0").strip()
 
-
-# ---------------------------
-# Helpers
-# ---------------------------
-def now_iso() -> str:
-    return datetime.utcnow().isoformat(timespec="seconds") + "Z"
+GITHUB_API = "https://api.github.com"
 
 
-def require_token() -> Optional[Tuple[Response, int]]:
+def utc_iso():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
+def require_env():
+    # We do NOT require DEFAULT_REPO for tool schema, but we need it at runtime unless caller provides repo.
     if not GITHUB_TOKEN:
-        return jsonify({
-            "error": "Missing GITHUB_TOKEN",
-            "hint": "Set GITHUB_TOKEN in Render Environment Variables"
-        }), 500
+        return "Missing GITHUB_TOKEN env var"
     return None
 
 
-def normalize_repo(repo: Optional[str]) -> str:
-    repo = (repo or "").strip() or DEFAULT_REPO
-    return repo
+def gh_headers():
+    return {
+        "Authorization": f"token {GITHUB_TOKEN}",
+        "Accept": "application/vnd.github+json",
+        "User-Agent": "ida-mcp-gateway",
+    }
 
 
-def normalize_branch(branch: Optional[str]) -> str:
-    return (branch or "").strip() or DEFAULT_BRANCH
+def get_repo(payload):
+    repo = (payload or {}).get("repo") or DEFAULT_REPO
+    return (repo or "").strip()
 
 
-def gh_get(url: str, params: Optional[Dict[str, Any]] = None) -> requests.Response:
-    return session.get(url, params=params, timeout=25)
+def get_ref(payload):
+    ref = (payload or {}).get("ref") or DEFAULT_BRANCH
+    return (ref or "").strip()
 
 
-def gh_put(url: str, payload: Dict[str, Any]) -> requests.Response:
-    return session.put(url, json=payload, timeout=25)
+# ---------- Tool implementations ----------
+def tool_health_check(_payload):
+    # No inputs
+    return {
+        "ok": True,
+        "message": "IDA MCP Gateway alive ✅",
+        "service": SERVICE_NAME,
+        "version": VERSION,
+        "ts": utc_iso(),
+        "defaults": {
+            "repo": DEFAULT_REPO or None,
+            "ref": DEFAULT_BRANCH,
+        },
+        "tools_loaded": 3,
+    }
 
 
-def gh_contents_url(repo: str, path: str) -> str:
-    path = path.lstrip("/")
-    return f"{GITHUB_API_BASE}/repos/{repo}/contents/{path}"
+def tool_github_read_file(payload):
+    err = require_env()
+    if err:
+        return {"ok": False, "error": err}
 
+    path = (payload or {}).get("path")
+    if not path:
+        return {"ok": False, "error": "Missing required input: path"}
 
-def github_read_file(repo: str, path: str, ref: Optional[str] = None) -> str:
-    """Return raw text content of a file in GitHub repo."""
-    repo = normalize_repo(repo)
-    ref = (ref or "").strip()
-
+    repo = get_repo(payload)
     if not repo:
-        raise ValueError("repo is required (owner/repo)")
+        return {"ok": False, "error": "No repo provided and DEFAULT_REPO is not set"}
 
-    url = gh_contents_url(repo, path)
-    params = {}
-    if ref:
-        params["ref"] = ref
+    ref = get_ref(payload)
 
-    r = gh_get(url, params=params)
+    url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
+    r = requests.get(url, headers=gh_headers(), params={"ref": ref}, timeout=30)
+
     if r.status_code != 200:
-        raise RuntimeError(f"GitHub read failed: {r.status_code} {r.text}")
+        return {
+            "ok": False,
+            "error": "GitHub read failed",
+            "status": r.status_code,
+            "details": safe_json(r),
+        }
 
     data = r.json()
-    # GitHub contents API returns base64 content for files
-    if isinstance(data, dict) and data.get("type") == "file" and "content" in data:
-        content_b64 = data["content"].replace("\n", "")
-        raw = base64.b64decode(content_b64).decode("utf-8", errors="replace")
-        return raw
+    content_b64 = data.get("content", "")
+    try:
+        decoded = base64.b64decode(content_b64).decode("utf-8", errors="replace")
+    except Exception:
+        decoded = ""
 
-    # fallback: if API returns something else
-    return json.dumps(data, ensure_ascii=False)
+    return {
+        "ok": True,
+        "repo": repo,
+        "ref": ref,
+        "path": path,
+        "sha": data.get("sha"),
+        "text": decoded,
+    }
 
 
-def github_write_file(
-    repo: str,
-    path: str,
-    content: str,
-    message: str,
-    branch: Optional[str] = None
-) -> Dict[str, Any]:
-    """Create or update a file in GitHub repo using Contents API."""
-    repo = normalize_repo(repo)
-    branch = normalize_branch(branch)
+def tool_github_write_file(payload):
+    err = require_env()
+    if err:
+        return {"ok": False, "error": err}
 
+    path = (payload or {}).get("path")
+    content = (payload or {}).get("content")
+    message = (payload or {}).get("message") or f"Update {path}"
+
+    if not path:
+        return {"ok": False, "error": "Missing required input: path"}
+    if content is None:
+        return {"ok": False, "error": "Missing required input: content"}
+
+    repo = get_repo(payload)
     if not repo:
-        raise ValueError("repo is required (owner/repo)")
-    if not path or not path.strip():
-        raise ValueError("path is required")
-    if not message or not message.strip():
-        raise ValueError("message is required")
+        return {"ok": False, "error": "No repo provided and DEFAULT_REPO is not set"}
 
-    url = gh_contents_url(repo, path)
-    # First: check if file exists to get sha
-    sha = None
-    r0 = gh_get(url, params={"ref": branch} if branch else None)
-    if r0.status_code == 200:
-        j0 = r0.json()
-        if isinstance(j0, dict) and j0.get("sha"):
-            sha = j0["sha"]
-    elif r0.status_code in (404,):
-        sha = None
-    else:
-        raise RuntimeError(f"GitHub preflight failed: {r0.status_code} {r0.text}")
+    ref = get_ref(payload)
 
-    payload: Dict[str, Any] = {
+    # Get existing SHA if file exists
+    url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
+    existing_sha = None
+    get_r = requests.get(url, headers=gh_headers(), params={"ref": ref}, timeout=30)
+    if get_r.status_code == 200:
+        existing_sha = get_r.json().get("sha")
+
+    body = {
         "message": message,
-        "content": base64.b64encode(content.encode("utf-8")).decode("ascii"),
+        "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
+        "branch": ref,
     }
-    if branch:
-        payload["branch"] = branch
-    if sha:
-        payload["sha"] = sha
+    if existing_sha:
+        body["sha"] = existing_sha
 
-    r1 = gh_put(url, payload)
-    if r1.status_code not in (200, 201):
-        raise RuntimeError(f"GitHub write failed: {r1.status_code} {r1.text}")
+    put_r = requests.put(url, headers=gh_headers(), data=json.dumps(body), timeout=30)
 
-    return r1.json()
-
-
-# ---------------------------
-# Tool registry (used by /tools and MCP tools/list)
-# ---------------------------
-TOOLS = [
-    {
-        "name": "github_read_file",
-        "description": "Read a file from a GitHub repo (returns raw text).",
-        "inputSchema": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "repo": {"type": "string", "description": "owner/repo (optional if DEFAULT_REPO is set)"},
-                "path": {"type": "string", "description": "Path in repo, e.g. README.md"},
-                "ref":  {"type": "string", "description": "Branch/tag/sha (optional)"}
-            },
-            "required": ["path"]
+    if put_r.status_code not in (200, 201):
+        return {
+            "ok": False,
+            "error": "GitHub write failed",
+            "status": put_r.status_code,
+            "details": safe_json(put_r),
         }
-    },
-    {
-        "name": "github_write_file",
-        "description": "Create or update a file in a GitHub repo and commit it.",
-        "inputSchema": {
-            "type": "object",
-            "additionalProperties": False,
-            "properties": {
-                "repo": {"type": "string", "description": "owner/repo (optional if DEFAULT_REPO is set)"},
-                "path": {"type": "string", "description": "Path in repo, e.g. agent_outbox/bridge_test.txt"},
-                "content": {"type": "string", "description": "File content (utf-8)"},
-                "message": {"type": "string", "description": "Commit message"},
-                "branch": {"type": "string", "description": "Branch (optional, default DEFAULT_BRANCH)"}
-            },
-            "required": ["path", "content", "message"]
-        }
-    },
-    {
-        "name": "health_check",
-        "description": "Simple health check.",
-        "inputSchema": {"type": "object", "additionalProperties": False, "properties": {}, "required": []}
+
+    out = put_r.json()
+    return {
+        "ok": True,
+        "repo": repo,
+        "ref": ref,
+        "path": path,
+        "commit": out.get("commit", {}).get("sha"),
+        "content_sha": out.get("content", {}).get("sha"),
+        "created": (put_r.status_code == 201),
+        "updated": (put_r.status_code == 200),
     }
-]
 
 
-def run_tool(name: str, args: Dict[str, Any]) -> str:
-    """Return text result (MCP will wrap it)."""
-    token_err = require_token()
-    if name in ("github_read_file", "github_write_file") and token_err:
-        # Raise to unify error handling downstream
-        raise RuntimeError("Missing GITHUB_TOKEN on server")
-
-    if name == "health_check":
-        return json.dumps({
-            "ok": True,
-            "service": "ida-mcp-gateway",
-            "version": APP_VERSION,
-            "ts": now_iso(),
-            "tools_loaded": len(TOOLS)
-        }, ensure_ascii=False)
-
-    if name == "github_read_file":
-        repo = args.get("repo")
-        path = args.get("path")
-        ref = args.get("ref")
-        if not path:
-            raise ValueError("path is required")
-        txt = github_read_file(repo=repo, path=path, ref=ref)
-        return txt
-
-    if name == "github_write_file":
-        repo = args.get("repo")
-        path = args.get("path")
-        content = args.get("content")
-        message = args.get("message")
-        branch = args.get("branch")
-        if not path or content is None or not message:
-            raise ValueError("path, content, message are required")
-        res = github_write_file(repo=repo, path=path, content=content, message=message, branch=branch)
-        # keep response compact
-        out = {
-            "ok": True,
-            "repo": normalize_repo(repo),
-            "path": path,
-            "branch": normalize_branch(branch),
-            "commit": (res.get("commit") or {}).get("sha"),
-            "content_sha": (res.get("content") or {}).get("sha"),
-            "ts": now_iso()
-        }
-        return json.dumps(out, ensure_ascii=False)
-
-    raise ValueError(f"Unknown tool: {name}")
+def safe_json(resp):
+    try:
+        return resp.json()
+    except Exception:
+        return {"text": resp.text[:2000]}
 
 
-# ---------------------------
-# Public endpoints
-# ---------------------------
+# ---------- MCP-ish endpoints ----------
 @app.get("/")
-def index():
-    # Always returns quickly; used by Render + your browser
-    return jsonify({
-        "message": "IDA MCP Gateway alive ✅",
-        "service": "ida-mcp-gateway",
-        "version": APP_VERSION,
-        "tools_loaded": len(TOOLS),
-        "ts": now_iso()
-    })
+def root():
+    return jsonify(tool_health_check({}))
+
+
+@app.get("/health")
+def health():
+    return jsonify(tool_health_check({}))
 
 
 @app.get("/tools")
 def tools():
-    # Agent Builder sometimes probes this; browser-friendly
-    return jsonify(TOOLS)
-
-
-# ---------------------------
-# MCP JSON-RPC endpoint (THIS is what Agent Builder wants)
-# ---------------------------
-@app.post("/mcp")
-def mcp():
-    # MCP over JSON-RPC 2.0 (minimal)
-    payload = request.get_json(silent=True) or {}
-    rpc_id = payload.get("id", None)
-    method = payload.get("method", "")
-    params = payload.get("params", {}) or {}
-
-    def ok(result: Any):
-        return jsonify({"jsonrpc": "2.0", "id": rpc_id, "result": result})
-
-    def err(code: int, message: str, data: Any = None):
-        e = {"code": code, "message": message}
-        if data is not None:
-            e["data"] = data
-        return jsonify({"jsonrpc": "2.0", "id": rpc_id, "error": e})
-
-    try:
-        # initialize
-        if method == "initialize":
-            # Keep it permissive; Agent Builder mostly wants a sane response.
-            result = {
-                "protocolVersion": "2024-11-05",
-                "serverInfo": {"name": "ida-mcp-gateway", "version": APP_VERSION},
-                "capabilities": {"tools": {}}
+    # IMPORTANT:
+    # - Keep schemas permissive (additionalProperties true)
+    # - Avoid requiring repo/ref (builder will choke and draw triangle)
+    return jsonify([
+        {
+            "name": "health_check",
+            "description": "Simple health check.",
+            "inputSchema": {
+                "type": "object",
+                "additionalProperties": True,
+                "properties": {}
             }
-            return ok(result)
+        },
+        {
+            "name": "github_read_file",
+            "description": "Read a file from a GitHub repo (returns raw text). If repo/ref omitted, server uses DEFAULT_REPO/DEFAULT_BRANCH.",
+            "inputSchema": {
+                "type": "object",
+                "additionalProperties": True,
+                "properties": {
+                    "path": {"type": "string", "description": "Path in repo, e.g. README.md"},
+                    "repo": {"type": "string", "description": "owner/repo (optional)"},
+                    "ref": {"type": "string", "description": "branch/tag/sha (optional, default main)"}
+                },
+                "required": ["path"]
+            }
+        },
+        {
+            "name": "github_write_file",
+            "description": "Create or update a file in a GitHub repo and commit it. If repo/ref omitted, server uses DEFAULT_REPO/DEFAULT_BRANCH.",
+            "inputSchema": {
+                "type": "object",
+                "additionalProperties": True,
+                "properties": {
+                    "path": {"type": "string", "description": "Path in repo, e.g. agent_outbox/bridge_test.txt"},
+                    "content": {"type": "string", "description": "File content (utf-8 string)"},
+                    "message": {"type": "string", "description": "Commit message (optional)"},
+                    "repo": {"type": "string", "description": "owner/repo (optional)"},
+                    "ref": {"type": "string", "description": "branch/tag/sha (optional, default main)"}
+                },
+                "required": ["path", "content"]
+            }
+        }
+    ])
 
-        # tools/list
-        if method == "tools/list":
-            return ok({"tools": TOOLS})
 
-        # tools/call
-        if method == "tools/call":
-            name = params.get("name")
-            arguments = params.get("arguments", {}) or {}
-            if not name:
-                return err(-32602, "Missing params.name")
+@app.post("/invoke")
+def invoke():
+    data = request.get_json(silent=True) or {}
+    tool_name = data.get("tool") or data.get("name")
+    payload = data.get("input") or data.get("arguments") or data.get("payload") or {}
 
-            text = run_tool(name, arguments)
+    if tool_name == "health_check":
+        return jsonify(tool_health_check(payload))
+    if tool_name == "github_read_file":
+        return jsonify(tool_github_read_file(payload))
+    if tool_name == "github_write_file":
+        return jsonify(tool_github_write_file(payload))
 
-            # MCP "content" format
-            return ok({
-                "content": [
-                    {"type": "text", "text": text}
-                ]
-            })
-
-        # ping (optional)
-        if method == "ping":
-            return ok({"ok": True, "ts": now_iso()})
-
-        return err(-32601, f"Method not found: {method}")
-
-    except ValueError as ve:
-        return err(-32602, "Invalid params", str(ve))
-    except Exception as ex:
-        return err(-32000, "Server error", str(ex))
+    return jsonify({"ok": False, "error": f"Unknown tool: {tool_name}"}), 400
 
 
-# ---------------------------
-# Render entry
-# ---------------------------
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "10000"))
     app.run(host="0.0.0.0", port=port)
