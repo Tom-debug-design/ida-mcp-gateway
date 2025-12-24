@@ -1,6 +1,5 @@
 import os
 import base64
-import json
 from datetime import datetime, timezone
 
 import requests
@@ -8,17 +7,11 @@ from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 
 app = Flask(__name__)
-
-# CORS: Builder er en diva. Gi den alt den trenger.
-CORS(
-    app,
-    resources={r"/*": {"origins": "*"}},
-    supports_credentials=False,
-)
+CORS(app)
 
 # ---------- Config ----------
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
-DEFAULT_REPO = os.getenv("DEFAULT_REPO", "").strip()  # e.g. "Tom-debug-design/atomicbot-agent"
+DEFAULT_REPO = os.getenv("DEFAULT_REPO", "").strip()      # optional
 DEFAULT_BRANCH = os.getenv("DEFAULT_BRANCH", "main").strip()
 SERVICE_NAME = os.getenv("SERVICE_NAME", "ida-mcp-gateway").strip()
 VERSION = os.getenv("VERSION", "1.4.1").strip()
@@ -30,14 +23,6 @@ def utc_iso():
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 
-def require_env():
-    if not GITHUB_TOKEN:
-        return "Missing GITHUB_TOKEN env var"
-    if not DEFAULT_REPO:
-        return "Missing DEFAULT_REPO env var (owner/repo)"
-    return None
-
-
 def gh_headers():
     return {
         "Authorization": f"token {GITHUB_TOKEN}",
@@ -46,225 +31,127 @@ def gh_headers():
     }
 
 
-def safe_json(resp):
-    try:
-        return resp.json()
-    except Exception:
-        return {"text": (resp.text or "")[:2000]}
-
-
-# Hard “no-cache” to stop builder from caching bad tool lists
-@app.after_request
-def add_common_headers(resp):
-    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-    resp.headers["Pragma"] = "no-cache"
-    resp.headers["Expires"] = "0"
+def ok_json(payload, status=200):
+    resp = make_response(jsonify(payload), status)
+    resp.headers["Content-Type"] = "application/json; charset=utf-8"
     return resp
 
 
-# ---------- Tool implementations ----------
-def tool_health_check(_payload):
+# ---------- Tool logic ----------
+def tool_health_check(_payload=None):
     return {
         "ok": True,
         "message": "IDA MCP Gateway alive ✅",
         "service": SERVICE_NAME,
         "version": VERSION,
         "ts": utc_iso(),
-        "defaults": {
-            "repo": DEFAULT_REPO or None,
-            "ref": DEFAULT_BRANCH,
-        },
-        "tools_loaded": 3,
+        "defaults": {"repo": DEFAULT_REPO or None, "ref": DEFAULT_BRANCH},
     }
 
 
 def tool_github_read_file(payload):
-    err = require_env()
-    if err:
-        return {"ok": False, "error": err}
+    if not GITHUB_TOKEN:
+        return {"ok": False, "error": "Missing GITHUB_TOKEN env var"}
 
-    path = (payload or {}).get("path")
+    payload = payload or {}
+
+    # NOTE: We intentionally allow missing fields (schema has no required)
+    path = (payload.get("path") or "").strip()
+    repo = (payload.get("repo") or DEFAULT_REPO or "").strip()
+    ref = (payload.get("ref") or DEFAULT_BRANCH or "").strip()
+
     if not path:
-        return {"ok": False, "error": "Missing required input: path"}
-
-    repo = DEFAULT_REPO
-    ref = DEFAULT_BRANCH
+        return {"ok": False, "error": "Missing input: path"}
+    if not repo:
+        return {"ok": False, "error": "Missing input: repo (and DEFAULT_REPO not set)"}
 
     url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
     r = requests.get(url, headers=gh_headers(), params={"ref": ref}, timeout=30)
 
     if r.status_code != 200:
-        return {
-            "ok": False,
-            "error": "GitHub read failed",
-            "status": r.status_code,
-            "details": safe_json(r),
-        }
+        try:
+            details = r.json()
+        except Exception:
+            details = {"text": r.text[:2000]}
+        return {"ok": False, "error": "GitHub read failed", "status": r.status_code, "details": details}
 
     data = r.json()
-    content_b64 = (data.get("content") or "").replace("\n", "")
+    content_b64 = (data.get("content") or "").encode("utf-8")
     try:
         decoded = base64.b64decode(content_b64).decode("utf-8", errors="replace")
     except Exception:
         decoded = ""
 
-    return {
-        "ok": True,
-        "repo": repo,
-        "ref": ref,
-        "path": path,
-        "sha": data.get("sha"),
-        "text": decoded,
-    }
+    return {"ok": True, "repo": repo, "ref": ref, "path": path, "sha": data.get("sha"), "text": decoded}
 
 
-def tool_github_write_file(payload):
-    err = require_env()
-    if err:
-        return {"ok": False, "error": err}
-
-    path = (payload or {}).get("path")
-    content = (payload or {}).get("content")
-    message = (payload or {}).get("message") or f"Update {path or 'file'}"
-
-    if not path:
-        return {"ok": False, "error": "Missing required input: path"}
-    if content is None:
-        return {"ok": False, "error": "Missing required input: content"}
-
-    repo = DEFAULT_REPO
-    ref = DEFAULT_BRANCH
-
-    url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
-
-    # Check existing SHA (optional update)
-    existing_sha = None
-    get_r = requests.get(url, headers=gh_headers(), params={"ref": ref}, timeout=30)
-    if get_r.status_code == 200:
-        existing_sha = (get_r.json() or {}).get("sha")
-
-    body = {
-        "message": message,
-        "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
-        "branch": ref,
-    }
-    if existing_sha:
-        body["sha"] = existing_sha
-
-    put_r = requests.put(url, headers=gh_headers(), data=json.dumps(body), timeout=30)
-
-    if put_r.status_code not in (200, 201):
-        return {
-            "ok": False,
-            "error": "GitHub write failed",
-            "status": put_r.status_code,
-            "details": safe_json(put_r),
-        }
-
-    out = put_r.json() or {}
-    return {
-        "ok": True,
-        "repo": repo,
-        "ref": ref,
-        "path": path,
-        "commit": (out.get("commit") or {}).get("sha"),
-        "content_sha": (out.get("content") or {}).get("sha"),
-        "created": (put_r.status_code == 201),
-        "updated": (put_r.status_code == 200),
-    }
-
-
-# ---------- Endpoints ----------
-@app.route("/", methods=["GET", "OPTIONS"])
+# ---------- Routes ----------
+@app.get("/")
 def root():
-    if request.method == "OPTIONS":
-        return make_response("", 204)
-    return jsonify(tool_health_check({}))
+    return ok_json(tool_health_check({}))
 
 
-@app.route("/health", methods=["GET", "OPTIONS"])
+@app.get("/health")
 def health():
-    if request.method == "OPTIONS":
-        return make_response("", 204)
-    return jsonify(tool_health_check({}))
+    return ok_json(tool_health_check({}))
 
 
-@app.route("/tools", methods=["GET", "OPTIONS"])
+@app.get("/tools")
 def tools():
-    if request.method == "OPTIONS":
-        return make_response("", 204)
-
-    # IMPORTANT: Minimal schemas to avoid builder “triangle”.
-    # Do NOT expose repo/ref as fields. Use DEFAULT_REPO/DEFAULT_BRANCH server-side.
-    tool_list = [
+    # CRITICAL: no required fields here. Builder edge validation must not demand inputs.
+    tools_list = [
         {
             "name": "health_check",
             "description": "Simple health check.",
-            "inputSchema": {
-                "type": "object",
-                "additionalProperties": True,
-                "properties": {},
-            },
+            "inputSchema": {"type": "object", "properties": {}, "additionalProperties": False},
+            "input_schema": {"type": "object", "properties": {}, "additionalProperties": False},
         },
         {
             "name": "github_read_file",
-            "description": "Read a file from DEFAULT_REPO (server-side) and return raw text.",
+            "description": "Read a file from GitHub and return raw text. (Inputs are OPTIONAL in schema; server will error if path missing.)",
             "inputSchema": {
                 "type": "object",
-                "additionalProperties": True,
+                "additionalProperties": False,
                 "properties": {
                     "path": {"type": "string", "description": "Path in repo, e.g. README.md"},
+                    "repo": {"type": "string", "description": "owner/repo (optional, defaults to DEFAULT_REPO)"},
+                    "ref": {"type": "string", "description": "branch/tag/sha (optional, defaults to DEFAULT_BRANCH)"},
                 },
-                "required": ["path"],
+                "required": [],
             },
-        },
-        {
-            "name": "github_write_file",
-            "description": "Create/update a file in DEFAULT_REPO (server-side) and commit it.",
-            "inputSchema": {
+            "input_schema": {
                 "type": "object",
-                "additionalProperties": True,
+                "additionalProperties": False,
                 "properties": {
-                    "path": {"type": "string", "description": "Path in repo, e.g. agent_outbox/bridge_test.txt"},
-                    "content": {"type": "string", "description": "File content (utf-8 string)"},
-                    "message": {"type": "string", "description": "Commit message (optional)"},
+                    "path": {"type": "string", "description": "Path in repo, e.g. README.md"},
+                    "repo": {"type": "string", "description": "owner/repo (optional, defaults to DEFAULT_REPO)"},
+                    "ref": {"type": "string", "description": "branch/tag/sha (optional, defaults to DEFAULT_BRANCH)"},
                 },
-                "required": ["path", "content"],
+                "required": [],
             },
         },
     ]
-
-    # Return as object (some clients prefer this over raw list)
-    return jsonify(
-        {
-            "service": SERVICE_NAME,
-            "version": VERSION,
-            "ts": utc_iso(),
-            "tools": tool_list,
-        }
-    )
+    # Some builders expect {"tools":[...]} instead of a raw list
+    return ok_json({"tools": tools_list})
 
 
 @app.route("/invoke", methods=["POST", "OPTIONS"])
 def invoke():
     if request.method == "OPTIONS":
-        return make_response("", 204)
+        return ok_json({"ok": True})
 
     data = request.get_json(silent=True) or {}
 
-    tool_name = data.get("tool") or data.get("name")
+    # Accept multiple variants
+    tool_name = data.get("tool") or data.get("name") or data.get("tool_name")
     payload = data.get("input") or data.get("arguments") or data.get("payload") or {}
 
     if tool_name == "health_check":
-        return jsonify(tool_health_check(payload))
-
+        return ok_json(tool_health_check(payload))
     if tool_name == "github_read_file":
-        return jsonify(tool_github_read_file(payload))
+        return ok_json(tool_github_read_file(payload))
 
-    if tool_name == "github_write_file":
-        return jsonify(tool_github_write_file(payload))
-
-    return jsonify({"ok": False, "error": f"Unknown tool: {tool_name}"}), 400
+    return ok_json({"ok": False, "error": f"Unknown tool: {tool_name}"}, status=400)
 
 
 if __name__ == "__main__":
