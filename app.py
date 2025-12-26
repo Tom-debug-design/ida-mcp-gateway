@@ -7,6 +7,8 @@ from typing import Any, Dict, Optional
 import requests
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Response
 
 # -----------------------------
 # Config
@@ -21,6 +23,16 @@ VERSION = os.getenv("VERSION", "2.0.0").strip()
 
 app = FastAPI(title=SERVICE_NAME, version=VERSION)
 
+# -----------------------------
+# CORS (required for Builder/Hoppscotch in browser)
+# -----------------------------
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],          # keep simple for now
+    allow_credentials=False,      # wildcard origins + credentials is problematic
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 def utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
@@ -48,13 +60,11 @@ def require_github_token() -> Optional[str]:
 
 
 def get_repo(args: Dict[str, Any]) -> str:
-    repo = (args.get("repo") or DEFAULT_REPO or "").strip()
-    return repo
+    return (args.get("repo") or DEFAULT_REPO or "").strip()
 
 
 def get_ref(args: Dict[str, Any]) -> str:
-    ref = (args.get("ref") or DEFAULT_BRANCH or "").strip()
-    return ref
+    return (args.get("ref") or DEFAULT_BRANCH or "").strip()
 
 
 # -----------------------------
@@ -179,11 +189,7 @@ def tool_github_write_file(args: Dict[str, Any]) -> Dict[str, Any]:
 TOOLS: Dict[str, Dict[str, Any]] = {
     "health_check": {
         "description": "Simple health check.",
-        "inputSchema": {
-            "type": "object",
-            "additionalProperties": True,
-            "properties": {},
-        },
+        "inputSchema": {"type": "object", "additionalProperties": True, "properties": {}},
         "handler": tool_health_check,
     },
     "github_read_file": {
@@ -234,11 +240,13 @@ def mcp_result(req_id: Any, result: Any) -> Dict[str, Any]:
 # Public endpoints (debug)
 # -----------------------------
 @app.get("/")
+@app.head("/")
 def root():
     return tool_health_check({})
 
 
 @app.get("/health")
+@app.head("/health")
 def health():
     return tool_health_check({})
 
@@ -249,7 +257,14 @@ def health():
 # - initialize
 # - tools/list
 # - tools/call
+# Also: browser clients require OPTIONS preflight.
 # -----------------------------
+@app.options("/mcp")
+def mcp_options():
+    # CORS middleware will add headers, this just ensures 200 OK for preflight.
+    return Response(status_code=200)
+
+
 @app.post("/mcp")
 async def mcp(request: Request):
     try:
@@ -266,57 +281,40 @@ async def mcp(request: Request):
 
     # 1) initialize
     if method == "initialize":
-        # Keep it permissive; Builder mainly wants a valid response.
         result = {
             "protocolVersion": params.get("protocolVersion", "2024-11-05"),
             "serverInfo": {"name": SERVICE_NAME, "version": VERSION},
-            "capabilities": {
-                "tools": {"listChanged": False},
-            },
+            "capabilities": {"tools": {"listChanged": False}},
         }
         return JSONResponse(mcp_result(req_id, result))
 
     # 2) tools/list
     if method in ("tools/list", "listTools"):
-        tools_list = []
-        for name, spec in TOOLS.items():
-            tools_list.append(
-                {
-                    "name": name,
-                    "description": spec["description"],
-                    "inputSchema": spec["inputSchema"],
-                }
-            )
+        tools_list = [
+            {"name": name, "description": spec["description"], "inputSchema": spec["inputSchema"]}
+            for name, spec in TOOLS.items()
+        ]
         return JSONResponse(mcp_result(req_id, {"tools": tools_list}))
 
     # 3) tools/call
     if method in ("tools/call", "callTool"):
-        name = params.get("name") or params.get("tool")  # some clients differ
+        name = params.get("name") or params.get("tool")
         args = params.get("arguments") or params.get("input") or {}
 
         if not name or name not in TOOLS:
-            return JSONResponse(mcp_error(req_id, -32602, "Unknown tool", {"name": name}))
+            return JSONResponse(mcp_error(req_id, -32602, "Unknown tool", {"name": name}), status_code=400)
 
         handler = TOOLS[name]["handler"]
         try:
             out = handler(args if isinstance(args, dict) else {})
         except Exception as e:
-            return JSONResponse(mcp_error(req_id, -32000, "Tool execution failed", {"error": str(e)}))
+            return JSONResponse(mcp_error(req_id, -32000, "Tool execution failed", {"error": str(e)}), status_code=500)
 
-        # MCP expects content array (text) – keep it simple and compatible.
-        return JSONResponse(
-            mcp_result(
-                req_id,
-                {
-                    "content": [
-                        {
-                            "type": "text",
-                            "text": json.dumps(out, ensure_ascii=False),
-                        }
-                    ],
-                    "isError": bool(out.get("ok") is False),
-                },
-            )
-        )
+        # MCP expects content array. Keep it predictable.
+        result = {
+            "content": [{"type": "text", "text": json.dumps(out, ensure_ascii=False)}],
+            "isError": bool(out.get("ok") is False),
+        }
+        return JSONResponse(mcp_result(req_id, result))
 
     return JSONResponse(mcp_error(req_id, -32601, f"Method not found: {method}"), status_code=400)
