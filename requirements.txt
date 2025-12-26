@@ -1,4 +1,4 @@
-flask
-flask-cors
+mcp[cli]
+starlette
+uvicorn
 requests
-gunicorn
