@@ -1,4 +1,3 @@
-mcp[cli]
-starlette
+fastapi
 uvicorn
 requests
