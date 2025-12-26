@@ -1,87 +1,100 @@
 import os
-import base64
 import json
+import base64
 from datetime import datetime, timezone
+from typing import Any, Dict, Optional
 
 import requests
-from mcp.server.fastmcp import FastMCP
-from starlette.applications import Starlette
-from starlette.routing import Mount
-from starlette.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
-# ---------- Config ----------
-GITHUB_TOKEN = (os.getenv("GITHUB_TOKEN") or "").strip()
-DEFAULT_REPO = (os.getenv("DEFAULT_REPO") or "").strip()          # "owner/repo"
-DEFAULT_BRANCH = (os.getenv("DEFAULT_BRANCH") or "main").strip()
-SERVICE_NAME = (os.getenv("SERVICE_NAME") or "ida-mcp-gateway").strip()
-VERSION = (os.getenv("VERSION") or "2.0.0").strip()
-
+# -----------------------------
+# Config
+# -----------------------------
 GITHUB_API = "https://api.github.com"
 
-def utc_iso():
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "").strip()
+DEFAULT_REPO = os.getenv("DEFAULT_REPO", "").strip()          # "owner/repo"
+DEFAULT_BRANCH = os.getenv("DEFAULT_BRANCH", "main").strip()
+SERVICE_NAME = os.getenv("SERVICE_NAME", "ida-mcp-gateway").strip()
+VERSION = os.getenv("VERSION", "2.0.0").strip()
+
+app = FastAPI(title=SERVICE_NAME, version=VERSION)
+
+
+def utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
-def require_github():
-    if not GITHUB_TOKEN:
-        return "Missing GITHUB_TOKEN"
-    return None
 
-def gh_headers():
+def gh_headers() -> Dict[str, str]:
     return {
         "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json",
-        "User-Agent": "ida-mcp-gateway",
+        "User-Agent": SERVICE_NAME,
     }
 
-def get_repo(args: dict):
-    return ((args.get("repo") or DEFAULT_REPO) or "").strip()
 
-def get_ref(args: dict):
-    return ((args.get("ref") or DEFAULT_BRANCH) or "").strip()
-
-def safe_json(resp):
+def safe_json(resp: requests.Response) -> Dict[str, Any]:
     try:
         return resp.json()
     except Exception:
         return {"text": (resp.text or "")[:2000]}
 
-# ---------- MCP Server ----------
-# Recommended for production: stateless_http + json_response
-mcp = FastMCP(SERVICE_NAME, stateless_http=True, json_response=True)  # streamable-http mounts at /mcp by default :contentReference[oaicite:1]{index=1}
 
-@mcp.tool()
-def health_check() -> dict:
-    """Health check for the MCP gateway."""
+def require_github_token() -> Optional[str]:
+    if not GITHUB_TOKEN:
+        return "Missing GITHUB_TOKEN env var"
+    return None
+
+
+def get_repo(args: Dict[str, Any]) -> str:
+    repo = (args.get("repo") or DEFAULT_REPO or "").strip()
+    return repo
+
+
+def get_ref(args: Dict[str, Any]) -> str:
+    ref = (args.get("ref") or DEFAULT_BRANCH or "").strip()
+    return ref
+
+
+# -----------------------------
+# Tools (business logic)
+# -----------------------------
+def tool_health_check(_args: Dict[str, Any]) -> Dict[str, Any]:
     return {
         "ok": True,
+        "message": "IDA MCP Gateway alive ✅",
         "service": SERVICE_NAME,
         "version": VERSION,
         "ts": utc_iso(),
-        "defaults": {
-            "repo": DEFAULT_REPO or None,
-            "ref": DEFAULT_BRANCH,
-        },
+        "defaults": {"repo": DEFAULT_REPO or None, "ref": DEFAULT_BRANCH},
     }
 
-@mcp.tool()
-def github_read_file(path: str, repo: str = "", ref: str = "") -> dict:
-    """Read a file from a GitHub repo (returns raw text)."""
-    err = require_github()
+
+def tool_github_read_file(args: Dict[str, Any]) -> Dict[str, Any]:
+    err = require_github_token()
     if err:
         return {"ok": False, "error": err}
 
-    args = {"repo": repo, "ref": ref}
+    path = (args.get("path") or "").strip()
+    if not path:
+        return {"ok": False, "error": "Missing required input: path"}
+
     repo = get_repo(args)
-    ref = get_ref(args)
-
     if not repo:
-        return {"ok": False, "error": "No repo provided and DEFAULT_REPO not set"}
+        return {"ok": False, "error": "No repo provided and DEFAULT_REPO is not set"}
 
+    ref = get_ref(args)
     url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
-    r = requests.get(url, headers=gh_headers(), params={"ref": ref}, timeout=30)
 
+    r = requests.get(url, headers=gh_headers(), params={"ref": ref}, timeout=30)
     if r.status_code != 200:
-        return {"ok": False, "error": "GitHub read failed", "status": r.status_code, "details": safe_json(r)}
+        return {
+            "ok": False,
+            "error": "GitHub read failed",
+            "status": r.status_code,
+            "details": safe_json(r),
+        }
 
     data = r.json()
     content_b64 = data.get("content", "") or ""
@@ -90,47 +103,64 @@ def github_read_file(path: str, repo: str = "", ref: str = "") -> dict:
     except Exception:
         decoded = ""
 
-    return {"ok": True, "repo": repo, "ref": ref, "path": path, "sha": data.get("sha"), "text": decoded}
+    return {
+        "ok": True,
+        "repo": repo,
+        "ref": ref,
+        "path": path,
+        "sha": data.get("sha"),
+        "text": decoded,
+    }
 
-@mcp.tool()
-def github_write_file(path: str, content: str, message: str = "", repo: str = "", ref: str = "") -> dict:
-    """Create/update a file in a GitHub repo and commit it."""
-    err = require_github()
+
+def tool_github_write_file(args: Dict[str, Any]) -> Dict[str, Any]:
+    err = require_github_token()
     if err:
         return {"ok": False, "error": err}
 
-    args = {"repo": repo, "ref": ref}
+    path = (args.get("path") or "").strip()
+    content = args.get("content")
+    message = (args.get("message") or f"Update {path}").strip()
+
+    if not path:
+        return {"ok": False, "error": "Missing required input: path"}
+    if content is None:
+        return {"ok": False, "error": "Missing required input: content"}
+
     repo = get_repo(args)
-    ref = get_ref(args)
-
     if not repo:
-        return {"ok": False, "error": "No repo provided and DEFAULT_REPO not set"}
+        return {"ok": False, "error": "No repo provided and DEFAULT_REPO is not set"}
 
-    if not message:
-        message = f"Update {path}"
-
+    ref = get_ref(args)
     url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
 
-    # Get existing SHA if file exists
+    # fetch existing sha (if present)
     existing_sha = None
     get_r = requests.get(url, headers=gh_headers(), params={"ref": ref}, timeout=30)
     if get_r.status_code == 200:
-        existing_sha = (get_r.json() or {}).get("sha")
+        try:
+            existing_sha = get_r.json().get("sha")
+        except Exception:
+            existing_sha = None
 
     body = {
         "message": message,
-        "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
+        "content": base64.b64encode(str(content).encode("utf-8")).decode("utf-8"),
         "branch": ref,
     }
     if existing_sha:
         body["sha"] = existing_sha
 
     put_r = requests.put(url, headers=gh_headers(), data=json.dumps(body), timeout=30)
-
     if put_r.status_code not in (200, 201):
-        return {"ok": False, "error": "GitHub write failed", "status": put_r.status_code, "details": safe_json(put_r)}
+        return {
+            "ok": False,
+            "error": "GitHub write failed",
+            "status": put_r.status_code,
+            "details": safe_json(put_r),
+        }
 
-    out = put_r.json() or {}
+    out = put_r.json()
     return {
         "ok": True,
         "repo": repo,
@@ -142,16 +172,151 @@ def github_write_file(path: str, content: str, message: str = "", repo: str = ""
         "updated": (put_r.status_code == 200),
     }
 
-# ---------- ASGI app (Render-friendly) ----------
-# Mount MCP streamable-http app at "/"
-# Clients will connect to https://<your-domain>/mcp  :contentReference[oaicite:2]{index=2}
-asgi_app = Starlette(routes=[Mount("/", app=mcp.streamable_http_app())])
 
-# CORS: needed for browser-based clients; harmless for Builder too :contentReference[oaicite:3]{index=3}
-app = CORSMiddleware(
-    asgi_app,
-    allow_origins=["*"],
-    allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["*"],
-    expose_headers=["Mcp-Session-Id"],
-)
+# -----------------------------
+# MCP tool registry + schemas
+# -----------------------------
+TOOLS: Dict[str, Dict[str, Any]] = {
+    "health_check": {
+        "description": "Simple health check.",
+        "inputSchema": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {},
+        },
+        "handler": tool_health_check,
+    },
+    "github_read_file": {
+        "description": "Read a file from a GitHub repo (returns raw text). If repo/ref omitted, server uses DEFAULT_REPO/DEFAULT_BRANCH.",
+        "inputSchema": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "path": {"type": "string", "description": "Path in repo, e.g. README.md"},
+                "repo": {"type": "string", "description": "owner/repo (optional)"},
+                "ref": {"type": "string", "description": "branch/tag/sha (optional, default main)"},
+            },
+            "required": ["path"],
+        },
+        "handler": tool_github_read_file,
+    },
+    "github_write_file": {
+        "description": "Create or update a file in a GitHub repo and commit it. If repo/ref omitted, server uses DEFAULT_REPO/DEFAULT_BRANCH.",
+        "inputSchema": {
+            "type": "object",
+            "additionalProperties": True,
+            "properties": {
+                "path": {"type": "string", "description": "Path in repo, e.g. agent_outbox/bridge_test.txt"},
+                "content": {"type": "string", "description": "File content (utf-8 string)"},
+                "message": {"type": "string", "description": "Commit message (optional)"},
+                "repo": {"type": "string", "description": "owner/repo (optional)"},
+                "ref": {"type": "string", "description": "branch/tag/sha (optional, default main)"},
+            },
+            "required": ["path", "content"],
+        },
+        "handler": tool_github_write_file,
+    },
+}
+
+
+def mcp_error(req_id: Any, code: int, message: str, data: Any = None) -> Dict[str, Any]:
+    err: Dict[str, Any] = {"code": code, "message": message}
+    if data is not None:
+        err["data"] = data
+    return {"jsonrpc": "2.0", "id": req_id, "error": err}
+
+
+def mcp_result(req_id: Any, result: Any) -> Dict[str, Any]:
+    return {"jsonrpc": "2.0", "id": req_id, "result": result}
+
+
+# -----------------------------
+# Public endpoints (debug)
+# -----------------------------
+@app.get("/")
+def root():
+    return tool_health_check({})
+
+
+@app.get("/health")
+def health():
+    return tool_health_check({})
+
+
+# -----------------------------
+# MCP JSON-RPC endpoint
+# Builder expects POST /mcp with methods:
+# - initialize
+# - tools/list
+# - tools/call
+# -----------------------------
+@app.post("/mcp")
+async def mcp(request: Request):
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse(mcp_error(None, -32700, "Parse error: invalid JSON"), status_code=400)
+
+    req_id = body.get("id")
+    method = body.get("method")
+    params = body.get("params") or {}
+
+    if body.get("jsonrpc") != "2.0" or not method:
+        return JSONResponse(mcp_error(req_id, -32600, "Invalid Request"), status_code=400)
+
+    # 1) initialize
+    if method == "initialize":
+        # Keep it permissive; Builder mainly wants a valid response.
+        result = {
+            "protocolVersion": params.get("protocolVersion", "2024-11-05"),
+            "serverInfo": {"name": SERVICE_NAME, "version": VERSION},
+            "capabilities": {
+                "tools": {"listChanged": False},
+            },
+        }
+        return JSONResponse(mcp_result(req_id, result))
+
+    # 2) tools/list
+    if method in ("tools/list", "listTools"):
+        tools_list = []
+        for name, spec in TOOLS.items():
+            tools_list.append(
+                {
+                    "name": name,
+                    "description": spec["description"],
+                    "inputSchema": spec["inputSchema"],
+                }
+            )
+        return JSONResponse(mcp_result(req_id, {"tools": tools_list}))
+
+    # 3) tools/call
+    if method in ("tools/call", "callTool"):
+        name = params.get("name") or params.get("tool")  # some clients differ
+        args = params.get("arguments") or params.get("input") or {}
+
+        if not name or name not in TOOLS:
+            return JSONResponse(mcp_error(req_id, -32602, "Unknown tool", {"name": name}))
+
+        handler = TOOLS[name]["handler"]
+        try:
+            out = handler(args if isinstance(args, dict) else {})
+        except Exception as e:
+            return JSONResponse(mcp_error(req_id, -32000, "Tool execution failed", {"error": str(e)}))
+
+        # MCP expects content array (text) – keep it simple and compatible.
+        return JSONResponse(
+            mcp_result(
+                req_id,
+                {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": json.dumps(out, ensure_ascii=False),
+                        }
+                    ],
+                    "isError": bool(out.get("ok") is False),
+                },
+            )
+        )
+
+    return JSONResponse(mcp_error(req_id, -32601, f"Method not found: {method}"), status_code=400)
