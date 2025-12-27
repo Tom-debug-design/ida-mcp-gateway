@@ -5,9 +5,10 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import requests
-from fastapi import FastAPI, Request, Response
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+
+from fastmcp import FastMCP  # <— NYTT
 
 # -----------------------------
 # Config
@@ -20,26 +21,12 @@ DEFAULT_BRANCH = os.getenv("DEFAULT_BRANCH", "main").strip()
 SERVICE_NAME = os.getenv("SERVICE_NAME", "ida-mcp-gateway").strip()
 VERSION = os.getenv("VERSION", "2.0.0").strip()
 
-app = FastAPI(title=SERVICE_NAME, version=VERSION)
-
-# -----------------------------
-# CORS (Builder/Hoppscotch in browser)
-# -----------------------------
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
 def utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
 def gh_headers() -> Dict[str, str]:
-    # Bearer fungerer for både classic PAT og fine-grained tokens
     return {
-        "Authorization": f"Bearer {GITHUB_TOKEN}",
+        "Authorization": f"token {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json",
         "User-Agent": SERVICE_NAME,
     }
@@ -55,16 +42,48 @@ def require_github_token() -> Optional[str]:
         return "Missing GITHUB_TOKEN env var"
     return None
 
-def get_repo(args: Dict[str, Any]) -> str:
-    return (args.get("repo") or DEFAULT_REPO or "").strip()
+def get_repo(repo: Optional[str]) -> str:
+    return (repo or DEFAULT_REPO or "").strip()
 
-def get_ref(args: Dict[str, Any]) -> str:
-    return (args.get("ref") or DEFAULT_BRANCH or "").strip()
+def get_ref(ref: Optional[str]) -> str:
+    return (ref or DEFAULT_BRANCH or "").strip()
 
 # -----------------------------
-# Tools (business logic)
+# FastAPI (health + CORS)
 # -----------------------------
-def tool_health_check(_args: Dict[str, Any]) -> Dict[str, Any]:
+app = FastAPI(title=SERVICE_NAME, version=VERSION)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.get("/")
+def root():
+    return {
+        "ok": True,
+        "message": "IDA MCP Gateway alive ✅",
+        "service": SERVICE_NAME,
+        "version": VERSION,
+        "ts": utc_iso(),
+        "defaults": {"repo": DEFAULT_REPO or None, "ref": DEFAULT_BRANCH},
+        "mcp_sse": "/sse/",
+    }
+
+@app.get("/health")
+def health():
+    return {"ok": True, "ts": utc_iso(), "service": SERVICE_NAME, "version": VERSION}
+
+# -----------------------------
+# MCP over SSE (for Builder)
+# -----------------------------
+mcp = FastMCP(name=SERVICE_NAME)
+
+@mcp.tool()
+async def health_check() -> Dict[str, Any]:
     return {
         "ok": True,
         "message": "IDA MCP Gateway alive ✅",
@@ -74,30 +93,23 @@ def tool_health_check(_args: Dict[str, Any]) -> Dict[str, Any]:
         "defaults": {"repo": DEFAULT_REPO or None, "ref": DEFAULT_BRANCH},
     }
 
-def tool_github_read_file(args: Dict[str, Any]) -> Dict[str, Any]:
+@mcp.tool()
+async def github_read_file(path: str, repo: Optional[str] = None, ref: Optional[str] = None) -> Dict[str, Any]:
     err = require_github_token()
     if err:
         return {"ok": False, "error": err}
-
-    path = (args.get("path") or "").strip()
     if not path:
         return {"ok": False, "error": "Missing required input: path"}
 
-    repo = get_repo(args)
-    if not repo:
+    repo_v = get_repo(repo)
+    if not repo_v:
         return {"ok": False, "error": "No repo provided and DEFAULT_REPO is not set"}
 
-    ref = get_ref(args)
-    url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
-
-    r = requests.get(url, headers=gh_headers(), params={"ref": ref}, timeout=30)
+    ref_v = get_ref(ref)
+    url = f"{GITHUB_API}/repos/{repo_v}/contents/{path}"
+    r = requests.get(url, headers=gh_headers(), params={"ref": ref_v}, timeout=30)
     if r.status_code != 200:
-        return {
-            "ok": False,
-            "error": "GitHub read failed",
-            "status": r.status_code,
-            "details": safe_json(r),
-        }
+        return {"ok": False, "error": "GitHub read failed", "status": r.status_code, "details": safe_json(r)}
 
     data = r.json()
     content_b64 = data.get("content", "") or ""
@@ -106,39 +118,31 @@ def tool_github_read_file(args: Dict[str, Any]) -> Dict[str, Any]:
     except Exception:
         decoded = ""
 
-    return {
-        "ok": True,
-        "repo": repo,
-        "ref": ref,
-        "path": path,
-        "sha": data.get("sha"),
-        "text": decoded,
-    }
+    return {"ok": True, "repo": repo_v, "ref": ref_v, "path": path, "sha": data.get("sha"), "text": decoded}
 
-def tool_github_write_file(args: Dict[str, Any]) -> Dict[str, Any]:
+@mcp.tool()
+async def github_write_file(
+    path: str,
+    content: str,
+    message: Optional[str] = None,
+    repo: Optional[str] = None,
+    ref: Optional[str] = None,
+) -> Dict[str, Any]:
     err = require_github_token()
     if err:
         return {"ok": False, "error": err}
-
-    path = (args.get("path") or "").strip()
-    content = args.get("content")
-    message = (args.get("message") or f"Update {path}").strip()
-
     if not path:
         return {"ok": False, "error": "Missing required input: path"}
-    if content is None:
-        return {"ok": False, "error": "Missing required input: content"}
 
-    repo = get_repo(args)
-    if not repo:
+    repo_v = get_repo(repo)
+    if not repo_v:
         return {"ok": False, "error": "No repo provided and DEFAULT_REPO is not set"}
 
-    ref = get_ref(args)
-    url = f"{GITHUB_API}/repos/{repo}/contents/{path}"
+    ref_v = get_ref(ref)
+    url = f"{GITHUB_API}/repos/{repo_v}/contents/{path}"
 
-    # fetch existing sha (if present)
     existing_sha = None
-    get_r = requests.get(url, headers=gh_headers(), params={"ref": ref}, timeout=30)
+    get_r = requests.get(url, headers=gh_headers(), params={"ref": ref_v}, timeout=30)
     if get_r.status_code == 200:
         try:
             existing_sha = get_r.json().get("sha")
@@ -146,27 +150,22 @@ def tool_github_write_file(args: Dict[str, Any]) -> Dict[str, Any]:
             existing_sha = None
 
     body = {
-        "message": message,
-        "content": base64.b64encode(str(content).encode("utf-8")).decode("utf-8"),
-        "branch": ref,
+        "message": (message or f"Update {path}"),
+        "content": base64.b64encode(content.encode("utf-8")).decode("utf-8"),
+        "branch": ref_v,
     }
     if existing_sha:
         body["sha"] = existing_sha
 
-    put_r = requests.put(url, headers=gh_headers(), json=body, timeout=30)
+    put_r = requests.put(url, headers=gh_headers(), data=json.dumps(body), timeout=30)
     if put_r.status_code not in (200, 201):
-        return {
-            "ok": False,
-            "error": "GitHub write failed",
-            "status": put_r.status_code,
-            "details": safe_json(put_r),
-        }
+        return {"ok": False, "error": "GitHub write failed", "status": put_r.status_code, "details": safe_json(put_r)}
 
     out = put_r.json()
     return {
         "ok": True,
-        "repo": repo,
-        "ref": ref,
+        "repo": repo_v,
+        "ref": ref_v,
         "path": path,
         "commit": (out.get("commit") or {}).get("sha"),
         "content_sha": (out.get("content") or {}).get("sha"),
@@ -174,130 +173,5 @@ def tool_github_write_file(args: Dict[str, Any]) -> Dict[str, Any]:
         "updated": (put_r.status_code == 200),
     }
 
-# -----------------------------
-# MCP tool registry + schemas
-# -----------------------------
-TOOLS: Dict[str, Dict[str, Any]] = {
-    "health_check": {
-        "description": "Simple health check.",
-        "inputSchema": {"type": "object", "additionalProperties": True, "properties": {}},
-        "handler": tool_health_check,
-    },
-    "github_read_file": {
-        "description": "Read a file from a GitHub repo (returns raw text). If repo/ref omitted, server uses DEFAULT_REPO/DEFAULT_BRANCH.",
-        "inputSchema": {
-            "type": "object",
-            "additionalProperties": True,
-            "properties": {
-                "path": {"type": "string", "description": "Path in repo, e.g. README.md"},
-                "repo": {"type": "string", "description": "owner/repo (optional)"},
-                "ref": {"type": "string", "description": "branch/tag/sha (optional, default main)"},
-            },
-            "required": ["path"],
-        },
-        "handler": tool_github_read_file,
-    },
-    "github_write_file": {
-        "description": "Create or update a file in a GitHub repo and commit it. If repo/ref omitted, server uses DEFAULT_REPO/DEFAULT_BRANCH.",
-        "inputSchema": {
-            "type": "object",
-            "additionalProperties": True,
-            "properties": {
-                "path": {"type": "string", "description": "Path in repo, e.g. agent_outbox/bridge_test.txt"},
-                "content": {"type": "string", "description": "File content (utf-8 string)"},
-                "message": {"type": "string", "description": "Commit message (optional)"},
-                "repo": {"type": "string", "description": "owner/repo (optional)"},
-                "ref": {"type": "string", "description": "branch/tag/sha (optional, default main)"},
-            },
-            "required": ["path", "content"],
-        },
-        "handler": tool_github_write_file,
-    },
-}
-
-def mcp_error(req_id: Any, code: int, message: str, data: Any = None) -> Dict[str, Any]:
-    err: Dict[str, Any] = {"code": code, "message": message}
-    if data is not None:
-        err["data"] = data
-    return {"jsonrpc": "2.0", "id": req_id, "error": err}
-
-def mcp_result(req_id: Any, result: Any) -> Dict[str, Any]:
-    return {"jsonrpc": "2.0", "id": req_id, "result": result}
-
-# -----------------------------
-# Public endpoints (debug)
-# -----------------------------
-@app.get("/")
-@app.head("/")
-def root():
-    return tool_health_check({})
-
-@app.get("/health")
-@app.head("/health")
-def health():
-    return tool_health_check({})
-
-# IMPORTANT: Builder/clients may probe /mcp with GET/HEAD/OPTIONS
-@app.get("/mcp")
-@app.head("/mcp")
-def mcp_probe():
-    return {"ok": True, "probe": True, "ts": utc_iso(), "service": SERVICE_NAME, "version": VERSION}
-
-@app.options("/mcp")
-def mcp_options():
-    return Response(status_code=200)
-
-# -----------------------------
-# MCP JSON-RPC endpoint (POST)
-# -----------------------------
-@app.post("/mcp")
-async def mcp(request: Request):
-    # Robust parse: handle weird content-type / raw body
-    try:
-        raw = await request.body()
-        body = json.loads(raw.decode("utf-8") if raw else "{}")
-    except Exception:
-        return JSONResponse(mcp_error(None, -32700, "Parse error: invalid JSON"), status_code=400)
-
-    req_id = body.get("id")
-    method = body.get("method")
-    params = body.get("params") or {}
-
-    if body.get("jsonrpc") != "2.0" or not method:
-        return JSONResponse(mcp_error(req_id, -32600, "Invalid Request"), status_code=400)
-
-    if method == "initialize":
-        result = {
-            "protocolVersion": params.get("protocolVersion", "2024-11-05"),
-            "serverInfo": {"name": SERVICE_NAME, "version": VERSION},
-            "capabilities": {"tools": {"listChanged": False}},
-        }
-        return JSONResponse(mcp_result(req_id, result))
-
-    if method in ("tools/list", "listTools"):
-        tools_list = [
-            {"name": name, "description": spec["description"], "inputSchema": spec["inputSchema"]}
-            for name, spec in TOOLS.items()
-        ]
-        return JSONResponse(mcp_result(req_id, {"tools": tools_list}))
-
-    if method in ("tools/call", "callTool"):
-        name = params.get("name") or params.get("tool")
-        args = params.get("arguments") or params.get("input") or {}
-
-        if not name or name not in TOOLS:
-            return JSONResponse(mcp_error(req_id, -32602, "Unknown tool", {"name": name}), status_code=400)
-
-        handler = TOOLS[name]["handler"]
-        try:
-            out = handler(args if isinstance(args, dict) else {})
-        except Exception as e:
-            return JSONResponse(mcp_error(req_id, -32000, "Tool execution failed", {"error": str(e)}), status_code=500)
-
-        result = {
-            "content": [{"type": "text", "text": json.dumps(out, ensure_ascii=False)}],
-            "isError": bool(out.get("ok") is False),
-        }
-        return JSONResponse(mcp_result(req_id, result))
-
-    return JSONResponse(mcp_error(req_id, -32601, f"Method not found: {method}"), status_code=400)
+# Mount SSE-endepunkter (gir /sse/)
+app.mount("/", mcp.http_app(path="/sse"))
