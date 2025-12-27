@@ -5,10 +5,9 @@ from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 import requests
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi import Response
 
 # -----------------------------
 # Config
@@ -24,12 +23,12 @@ VERSION = os.getenv("VERSION", "2.0.0").strip()
 app = FastAPI(title=SERVICE_NAME, version=VERSION)
 
 # -----------------------------
-# CORS (required for Builder/Hoppscotch in browser)
+# CORS (Builder/Hoppscotch in browser)
 # -----------------------------
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],          # keep simple for now
-    allow_credentials=False,      # wildcard origins + credentials is problematic
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -37,14 +36,13 @@ app.add_middleware(
 def utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
 
-
 def gh_headers() -> Dict[str, str]:
+    # Bearer fungerer for både classic PAT og fine-grained tokens
     return {
-        "Authorization": f"token {GITHUB_TOKEN}",
+        "Authorization": f"Bearer {GITHUB_TOKEN}",
         "Accept": "application/vnd.github+json",
         "User-Agent": SERVICE_NAME,
     }
-
 
 def safe_json(resp: requests.Response) -> Dict[str, Any]:
     try:
@@ -52,20 +50,16 @@ def safe_json(resp: requests.Response) -> Dict[str, Any]:
     except Exception:
         return {"text": (resp.text or "")[:2000]}
 
-
 def require_github_token() -> Optional[str]:
     if not GITHUB_TOKEN:
         return "Missing GITHUB_TOKEN env var"
     return None
 
-
 def get_repo(args: Dict[str, Any]) -> str:
     return (args.get("repo") or DEFAULT_REPO or "").strip()
 
-
 def get_ref(args: Dict[str, Any]) -> str:
     return (args.get("ref") or DEFAULT_BRANCH or "").strip()
-
 
 # -----------------------------
 # Tools (business logic)
@@ -79,7 +73,6 @@ def tool_health_check(_args: Dict[str, Any]) -> Dict[str, Any]:
         "ts": utc_iso(),
         "defaults": {"repo": DEFAULT_REPO or None, "ref": DEFAULT_BRANCH},
     }
-
 
 def tool_github_read_file(args: Dict[str, Any]) -> Dict[str, Any]:
     err = require_github_token()
@@ -122,7 +115,6 @@ def tool_github_read_file(args: Dict[str, Any]) -> Dict[str, Any]:
         "text": decoded,
     }
 
-
 def tool_github_write_file(args: Dict[str, Any]) -> Dict[str, Any]:
     err = require_github_token()
     if err:
@@ -161,7 +153,7 @@ def tool_github_write_file(args: Dict[str, Any]) -> Dict[str, Any]:
     if existing_sha:
         body["sha"] = existing_sha
 
-    put_r = requests.put(url, headers=gh_headers(), data=json.dumps(body), timeout=30)
+    put_r = requests.put(url, headers=gh_headers(), json=body, timeout=30)
     if put_r.status_code not in (200, 201):
         return {
             "ok": False,
@@ -181,7 +173,6 @@ def tool_github_write_file(args: Dict[str, Any]) -> Dict[str, Any]:
         "created": (put_r.status_code == 201),
         "updated": (put_r.status_code == 200),
     }
-
 
 # -----------------------------
 # MCP tool registry + schemas
@@ -224,17 +215,14 @@ TOOLS: Dict[str, Dict[str, Any]] = {
     },
 }
 
-
 def mcp_error(req_id: Any, code: int, message: str, data: Any = None) -> Dict[str, Any]:
     err: Dict[str, Any] = {"code": code, "message": message}
     if data is not None:
         err["data"] = data
     return {"jsonrpc": "2.0", "id": req_id, "error": err}
 
-
 def mcp_result(req_id: Any, result: Any) -> Dict[str, Any]:
     return {"jsonrpc": "2.0", "id": req_id, "result": result}
-
 
 # -----------------------------
 # Public endpoints (debug)
@@ -244,31 +232,30 @@ def mcp_result(req_id: Any, result: Any) -> Dict[str, Any]:
 def root():
     return tool_health_check({})
 
-
 @app.get("/health")
 @app.head("/health")
 def health():
     return tool_health_check({})
 
+# IMPORTANT: Builder/clients may probe /mcp with GET/HEAD/OPTIONS
+@app.get("/mcp")
+@app.head("/mcp")
+def mcp_probe():
+    return {"ok": True, "probe": True, "ts": utc_iso(), "service": SERVICE_NAME, "version": VERSION}
 
-# -----------------------------
-# MCP JSON-RPC endpoint
-# Builder expects POST /mcp with methods:
-# - initialize
-# - tools/list
-# - tools/call
-# Also: browser clients require OPTIONS preflight.
-# -----------------------------
 @app.options("/mcp")
 def mcp_options():
-    # CORS middleware will add headers, this just ensures 200 OK for preflight.
     return Response(status_code=200)
 
-
+# -----------------------------
+# MCP JSON-RPC endpoint (POST)
+# -----------------------------
 @app.post("/mcp")
 async def mcp(request: Request):
+    # Robust parse: handle weird content-type / raw body
     try:
-        body = await request.json()
+        raw = await request.body()
+        body = json.loads(raw.decode("utf-8") if raw else "{}")
     except Exception:
         return JSONResponse(mcp_error(None, -32700, "Parse error: invalid JSON"), status_code=400)
 
@@ -279,7 +266,6 @@ async def mcp(request: Request):
     if body.get("jsonrpc") != "2.0" or not method:
         return JSONResponse(mcp_error(req_id, -32600, "Invalid Request"), status_code=400)
 
-    # 1) initialize
     if method == "initialize":
         result = {
             "protocolVersion": params.get("protocolVersion", "2024-11-05"),
@@ -288,7 +274,6 @@ async def mcp(request: Request):
         }
         return JSONResponse(mcp_result(req_id, result))
 
-    # 2) tools/list
     if method in ("tools/list", "listTools"):
         tools_list = [
             {"name": name, "description": spec["description"], "inputSchema": spec["inputSchema"]}
@@ -296,7 +281,6 @@ async def mcp(request: Request):
         ]
         return JSONResponse(mcp_result(req_id, {"tools": tools_list}))
 
-    # 3) tools/call
     if method in ("tools/call", "callTool"):
         name = params.get("name") or params.get("tool")
         args = params.get("arguments") or params.get("input") or {}
@@ -310,7 +294,6 @@ async def mcp(request: Request):
         except Exception as e:
             return JSONResponse(mcp_error(req_id, -32000, "Tool execution failed", {"error": str(e)}), status_code=500)
 
-        # MCP expects content array. Keep it predictable.
         result = {
             "content": [{"type": "text", "text": json.dumps(out, ensure_ascii=False)}],
             "isError": bool(out.get("ok") is False),
