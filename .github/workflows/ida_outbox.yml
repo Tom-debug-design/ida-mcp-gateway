@@ -2,8 +2,11 @@ name: IDA Outbox Runner
 
 on:
   push:
+    branches:
+      - main
     paths:
       - "agent_outbox/**"
+
 
 jobs:
   run-outbox:
