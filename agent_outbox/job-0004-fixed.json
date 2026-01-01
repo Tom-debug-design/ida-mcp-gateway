@@ -1,0 +1,7 @@
+{
+  "job_id": "job-0004-fixed",
+  "action": "write_result",
+  "out_path": "agent_results/job-0004.txt",
+  "out_content": "IDA executed job-0004 successfully via GitHub Actions.",
+  "created_at": "2026-01-01T23:25:00Z"
+}
