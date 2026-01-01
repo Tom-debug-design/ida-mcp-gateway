@@ -1,0 +1,32 @@
+name: IDA Outbox Runner
+
+on:
+  push:
+    paths:
+      - "agent_outbox/**"
+
+jobs:
+  run-outbox:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: List outbox files
+        run: |
+          echo "=== agent_outbox contents ==="
+          ls -la agent_outbox || true
+
+      - name: Print latest outbox file (best effort)
+        run: |
+          set -e
+          echo "=== latest file in agent_outbox ==="
+          latest=$(ls -1t agent_outbox | head -n 1 || true)
+          if [ -z "$latest" ]; then
+            echo "No files found in agent_outbox."
+            exit 0
+          fi
+          echo "Latest: $latest"
+          echo "=== content ==="
+          cat "agent_outbox/$latest"
