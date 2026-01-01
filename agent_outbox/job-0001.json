@@ -1,0 +1,10 @@
+{
+  "job_id": "job-0001",
+  "source": "IDA",
+  "type": "command",
+  "action": "echo",
+  "payload": {
+    "message": "IDA is alive and executing real jobs."
+  },
+  "created_at": "2026-01-01T23:10:00Z"
+}
