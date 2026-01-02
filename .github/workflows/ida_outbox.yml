@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "agent_outbox/**"
+      - agent_outbox/**
 
 permissions:
   contents: write
@@ -19,37 +19,24 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: List outbox files
+      - name: Execute latest outbox job (write_result)
+        shell: bash
         run: |
+          set -e
+
           echo "=== agent_outbox contents ==="
           ls -la agent_outbox || true
 
-      - name: Print latest outbox file (best effort)
-        run: |
-          set -e
-          echo "=== latest file in agent_outbox ==="
           latest="$(ls -1t agent_outbox 2>/dev/null | head -n 1 || true)"
           if [ -z "$latest" ]; then
             echo "No files found in agent_outbox."
             exit 0
           fi
-          echo "Latest: $latest"
-          echo "=== content ==="
-          cat "agent_outbox/$latest"
-
-      - name: Execute outbox job (write_result)
-        shell: bash
-        run: |
-          set -e
-
-          latest="$(ls -1t agent_outbox 2>/dev/null | head -n 1 || true)"
-          if [ -z "$latest" ]; then
-            echo "No files in agent_outbox."
-            exit 0
-          fi
 
           echo "Latest: $latest"
           content="$(cat "agent_outbox/$latest")"
+          echo "=== content ==="
+          echo "$content"
 
           action="$(echo "$content" | python -c "import sys,json; print(json.load(sys.stdin).get('action',''))")"
           if [ "$action" != "write_result" ]; then
@@ -64,7 +51,7 @@ jobs:
           printf "%s\n" "$out_content" > "$out_path"
 
           echo "Wrote: $out_path"
-          echo "-----"
+          echo "----"
           cat "$out_path"
 
       - name: Commit results back to repo
