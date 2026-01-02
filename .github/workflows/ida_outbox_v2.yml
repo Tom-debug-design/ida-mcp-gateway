@@ -1,0 +1,71 @@
+name: IDA Outbox Runner v2
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - "agent_outbox/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ida-outbox-v2
+  cancel-in-progress: false
+
+jobs:
+  run-outbox:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Show outbox
+        run: |
+          echo "=== agent_outbox ==="
+          ls -la agent_outbox || true
+          echo "=== latest file ==="
+          latest=$(ls -1t agent_outbox 2>/dev/null | head -n 1 || true)
+          echo "Latest: ${latest:-<none>}"
+
+      - name: Execute write_result (if present)
+        run: |
+          set -e
+          latest=$(ls -1t agent_outbox 2>/dev/null | head -n 1 || true)
+          if [ -z "$latest" ]; then
+            echo "No files in agent_outbox."
+            exit 0
+          fi
+
+          content="$(cat "agent_outbox/$latest")"
+          action="$(printf "%s" "$content" | python3 -c "import sys,json; print(json.load(sys.stdin).get('action',''))" || true)"
+
+          echo "Action: $action"
+          if [ "$action" != "write_result" ]; then
+            echo "Not write_result -> exit."
+            exit 0
+          fi
+
+          out_path="$(printf "%s" "$content" | python3 -c "import sys,json; print(json.load(sys.stdin).get('out_path','agent_results/result.txt'))")"
+          out_content="$(printf "%s" "$content" | python3 -c "import sys,json; print(json.load(sys.stdin).get('out_content',''))")"
+
+          mkdir -p "$(dirname "$out_path")"
+          printf "%s\n" "$out_content" > "$out_path"
+          echo "Wrote: $out_path"
+          echo "----"
+          cat "$out_path"
+
+      - name: Commit results back
+        run: |
+          git config user.name "ida-outbox-bot"
+          git config user.email "ida-outbox-bot@users.noreply.github.com"
+          if git status --porcelain | grep -q .; then
+            git add -A
+            git commit -m "IDA v2: write_result output"
+            git push
+          else
+            echo "No changes to commit."
+          fi
