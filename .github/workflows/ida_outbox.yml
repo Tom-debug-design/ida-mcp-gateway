@@ -2,10 +2,9 @@ name: IDA Outbox Runner
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
     paths:
-      - agent_outbox/**
+      - "agent_outbox/**"
 
 permissions:
   contents: write
@@ -22,7 +21,7 @@ jobs:
       - name: Execute latest outbox job (write_result)
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
 
           echo "=== agent_outbox contents ==="
           ls -la agent_outbox || true
@@ -35,12 +34,13 @@ jobs:
 
           echo "Latest: $latest"
           content="$(cat "agent_outbox/$latest")"
-          echo "=== content ==="
-          echo "$content"
 
-          action="$(echo "$content" | python -c "import sys,json; print(json.load(sys.stdin).get('action',''))")"
+          # Parse action (default empty)
+          action="$(echo "$content" | python -c "import sys,json; print(json.load(sys.stdin).get('action',''))" || true)"
+          echo "Action: $action"
+
           if [ "$action" != "write_result" ]; then
-            echo "Action is '$action' (not write_result). Nothing to do."
+            echo "Not a write_result job. Nothing to do."
             exit 0
           fi
 
@@ -57,7 +57,7 @@ jobs:
       - name: Commit results back to repo
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           git config user.name "ida-outbox-bot"
           git config user.email "ida-outbox-bot@users.noreply.github.com"
 
