@@ -13,3 +13,6 @@ jobs:
       - run: |
           echo "Runner OK"
           ls -la agent_outbox || true
+      - name: Show latest outbox file
+        run: |
+          ls -1t agent_outbox 2>/dev/null | head -n 1 || echo "No outbox files"
