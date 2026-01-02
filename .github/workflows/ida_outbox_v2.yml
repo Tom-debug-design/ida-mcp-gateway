@@ -17,51 +17,90 @@ concurrency:
 jobs:
   run-outbox:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Show outbox
+      - name: Show outbox (debug)
         run: |
-          echo "=== agent_outbox ==="
+          echo "=== agent_outbox listing ==="
           ls -la agent_outbox || true
-          echo "=== latest file ==="
-          latest=$(ls -1t agent_outbox 2>/dev/null | head -n 1 || true)
+          echo "=== latest JSON ==="
+          latest="$(ls -1t agent_outbox/*.json 2>/dev/null | head -n 1 || true)"
           echo "Latest: ${latest:-<none>}"
+          if [ -n "$latest" ]; then
+            echo "--- file content ---"
+            cat "$latest" || true
+            echo "--------------------"
+          fi
 
-      - name: Execute write_result (if present)
+      - name: Execute write_result (safe)
         run: |
           set -e
-          latest=$(ls -1t agent_outbox 2>/dev/null | head -n 1 || true)
+          latest="$(ls -1t agent_outbox/*.json 2>/dev/null | head -n 1 || true)"
+          echo "Latest: ${latest:-<none>}"
+
           if [ -z "$latest" ]; then
-            echo "No files in agent_outbox."
+            echo "No JSON files in agent_outbox. Exit."
             exit 0
           fi
 
-          content="$(cat "agent_outbox/$latest")"
-          action="$(printf "%s" "$content" | python3 -c "import sys,json; print(json.load(sys.stdin).get('action',''))" || true)"
+          export LATEST_FILE="$latest"
 
-          echo "Action: $action"
-          if [ "$action" != "write_result" ]; then
-            echo "Not write_result -> exit."
-            exit 0
-          fi
+          python3 - <<'PY'
+import json, os, sys
 
-          out_path="$(printf "%s" "$content" | python3 -c "import sys,json; print(json.load(sys.stdin).get('out_path','agent_results/result.txt'))")"
-          out_content="$(printf "%s" "$content" | python3 -c "import sys,json; print(json.load(sys.stdin).get('out_content',''))")"
+latest = os.environ.get("LATEST_FILE")
+if not latest:
+    print("No latest file.")
+    sys.exit(0)
 
-          mkdir -p "$(dirname "$out_path")"
-          printf "%s\n" "$out_content" > "$out_path"
-          echo "Wrote: $out_path"
-          echo "----"
-          cat "$out_path"
+# Read JSON safely from file
+try:
+    with open(latest, "r", encoding="utf-8") as f:
+        data = json.load(f)
+except Exception as e:
+    print("JSON read failed:", e)
+    sys.exit(0)  # keep green, but do nothing
+
+action = (data.get("action") or "").strip()
+print("Action:", action)
+
+if action != "write_result":
+    print("Not write_result -> exit.")
+    sys.exit(0)
+
+out_path = (data.get("out_path") or "").strip()
+out_content = data.get("out_content")
+if out_content is None:
+    out_content = ""
+
+# Force all writes into agent_results/
+if not out_path:
+    out_path = "agent_results/hello.txt"
+if not out_path.startswith("agent_results/"):
+    out_path = "agent_results/" + out_path.lstrip("/")
+
+os.makedirs(os.path.dirname(out_path), exist_ok=True)
+
+with open(out_path, "w", encoding="utf-8") as f:
+    f.write(str(out_content))
+
+print("Wrote:", out_path)
+PY
 
       - name: Commit results back
         run: |
+          set -e
           git config user.name "ida-outbox-bot"
           git config user.email "ida-outbox-bot@users.noreply.github.com"
+
+          echo "=== git status ==="
+          git status --porcelain || true
+
           if git status --porcelain | grep -q .; then
             git add -A
             git commit -m "IDA v2: write_result output"
