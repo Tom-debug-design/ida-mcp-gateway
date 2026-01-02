@@ -5,6 +5,8 @@ on:
     branches: [ main ]
     paths:
       - "agent_outbox/**"
+      - ".github/workflows/ida_outbox_v2.yml"
+      - "tools/outbox_runner.py"
   workflow_dispatch:
 
 permissions:
@@ -19,78 +21,33 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Show outbox (debug)
+      - name: Debug list outbox
         run: |
-          echo "=== agent_outbox listing ==="
+          echo "=== agent_outbox ==="
           ls -la agent_outbox || true
-          echo "=== latest JSON ==="
-          latest="$(ls -1t agent_outbox/*.json 2>/dev/null | head -n 1 || true)"
-          echo "Latest: ${latest:-<none>}"
-          if [ -n "$latest" ]; then
-            echo "--- file content ---"
-            cat "$latest" || true
-            echo "--------------------"
-          fi
 
-      - name: Execute write_result (safe)
+      - name: Pick latest JSON
+        id: pick
+        shell: bash
         run: |
           set -e
           latest="$(ls -1t agent_outbox/*.json 2>/dev/null | head -n 1 || true)"
+          echo "LATEST=$latest" >> $GITHUB_ENV
           echo "Latest: ${latest:-<none>}"
 
-          if [ -z "$latest" ]; then
-            echo "No JSON files in agent_outbox. Exit."
+      - name: Run outbox runner
+        run: |
+          set -e
+          if [ -z "${LATEST:-}" ]; then
+            echo "No outbox JSON found. Exit."
             exit 0
           fi
-
-          export LATEST_FILE="$latest"
-
-          python3 - <<'PY'
-import json, os, sys
-
-latest = os.environ.get("LATEST_FILE")
-if not latest:
-    print("No latest file.")
-    sys.exit(0)
-
-# Read JSON safely from file
-try:
-    with open(latest, "r", encoding="utf-8") as f:
-        data = json.load(f)
-except Exception as e:
-    print("JSON read failed:", e)
-    sys.exit(0)  # keep green, but do nothing
-
-action = (data.get("action") or "").strip()
-print("Action:", action)
-
-if action != "write_result":
-    print("Not write_result -> exit.")
-    sys.exit(0)
-
-out_path = (data.get("out_path") or "").strip()
-out_content = data.get("out_content")
-if out_content is None:
-    out_content = ""
-
-# Force all writes into agent_results/
-if not out_path:
-    out_path = "agent_results/hello.txt"
-if not out_path.startswith("agent_results/"):
-    out_path = "agent_results/" + out_path.lstrip("/")
-
-os.makedirs(os.path.dirname(out_path), exist_ok=True)
-
-with open(out_path, "w", encoding="utf-8") as f:
-    f.write(str(out_content))
-
-print("Wrote:", out_path)
-PY
+          python3 tools/outbox_runner.py "$LATEST"
 
       - name: Commit results back
         run: |
