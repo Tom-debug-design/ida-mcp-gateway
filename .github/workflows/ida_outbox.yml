@@ -17,13 +17,18 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          fetch-depth: 0
 
       - name: List outbox files
+        shell: bash
         run: |
           echo "=== agent_outbox contents ==="
           ls -la agent_outbox || true
 
       - name: Print latest outbox file (best effort)
+        shell: bash
         run: |
           set -e
           echo "=== latest file in agent_outbox ==="
@@ -34,9 +39,10 @@ jobs:
           fi
           echo "Latest: $latest"
           echo "=== content ==="
-          cat "agent_outbox/$latest"
+          cat "agent_outbox/$latest" || true
 
       - name: Execute outbox job (write_result)
+        shell: bash
         run: |
           set -e
 
@@ -62,20 +68,20 @@ jobs:
           printf "%s\n" "$out_content" > "$out_path"
 
           echo "Wrote: $out_path"
-          echo "-----"
+          echo "----"
           cat "$out_path"
 
       - name: Commit results back to repo
+        shell: bash
         run: |
           set -e
-
           git config user.name "ida-outbox-bot"
           git config user.email "ida-outbox-bot@users.noreply.github.com"
 
-          if git status --porcelain | grep -q .; then
+          if [ -n "$(git status --porcelain)" ]; then
             git add -A
             git commit -m "IDA: write_result output"
-            git push
+            git push origin HEAD:main
           else
             echo "No changes to commit."
           fi
