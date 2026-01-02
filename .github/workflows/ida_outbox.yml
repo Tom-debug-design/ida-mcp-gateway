@@ -8,4 +8,9 @@ jobs:
   smoke:
     runs-on: ubuntu-latest
     steps:
-      - run: echo "OK - workflow parsed"
+  - uses: actions/checkout@v4
+
+  - run: |
+      echo "Runner OK"
+      ls -la agent_outbox || true
+
