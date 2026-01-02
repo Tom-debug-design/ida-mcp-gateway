@@ -20,11 +20,13 @@ jobs:
           fetch-depth: 0
 
       - name: List outbox files
+        shell: bash
         run: |
           echo "=== agent_outbox contents ==="
           ls -la agent_outbox || true
 
       - name: Print latest outbox file
+        shell: bash
         run: |
           set -e
           echo "=== latest file in agent_outbox ==="
@@ -38,6 +40,7 @@ jobs:
           cat "agent_outbox/$latest"
 
       - name: Execute outbox job (write_result)
+        shell: bash
         run: |
           set -e
           latest=$(ls -1t agent_outbox 2>/dev/null | head -n 1 || true)
@@ -47,23 +50,29 @@ jobs:
           fi
           echo "Latest: $latest"
           content=$(cat "agent_outbox/$latest")
+
           action=$(echo "$content" | python3 -c "import sys,json; print(json.load(sys.stdin).get('action',''))" || true)
           if [ "$action" != "write_result" ]; then
             echo "Action is '$action' (not write_result). Nothing to do."
             exit 0
           fi
+
           out_path=$(echo "$content" | python3 -c "import sys,json; print(json.load(sys.stdin).get('out_path','agent_results/result.txt'))")
           out_content=$(echo "$content" | python3 -c "import sys,json; print(json.load(sys.stdin).get('out_content',''))")
+
           mkdir -p "$(dirname "$out_path")"
           printf "%s\n" "$out_content" > "$out_path"
+
           echo "Wrote: $out_path"
           echo "----"
           cat "$out_path"
 
       - name: Commit results back to repo
+        shell: bash
         run: |
           git config user.name "ida-outbox-bot"
           git config user.email "ida-outbox-bot@users.noreply.github.com"
+
           if git status --porcelain | grep -q .; then
             git add -A
             git commit -m "IDA: write_result output"
