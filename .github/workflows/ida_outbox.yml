@@ -1,3 +1,4 @@
+
 name: IDA Outbox Runner
 
 on:
@@ -7,9 +8,6 @@ on:
     paths:
       - "agent_outbox/**"
 
-permissions:
-  contents: write
-
 jobs:
   run-outbox:
     runs-on: ubuntu-latest
@@ -17,52 +15,46 @@ jobs:
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-        with:
-          persist-credentials: true
-          fetch-depth: 0
 
       - name: List outbox files
-        shell: bash
         run: |
           echo "=== agent_outbox contents ==="
           ls -la agent_outbox || true
 
       - name: Print latest outbox file (best effort)
-        shell: bash
         run: |
           set -e
           echo "=== latest file in agent_outbox ==="
-          latest="$(ls -1t agent_outbox 2>/dev/null | head -n 1 || true)"
+          latest=$(ls -1t agent_outbox 2>/dev/null | head -n 1 || true)
           if [ -z "$latest" ]; then
             echo "No files found in agent_outbox."
             exit 0
           fi
           echo "Latest: $latest"
           echo "=== content ==="
-          cat "agent_outbox/$latest" || true
+          cat "agent_outbox/$latest"
 
       - name: Execute outbox job (write_result)
-        shell: bash
         run: |
           set -e
 
-          latest="$(ls -1t agent_outbox 2>/dev/null | head -n 1 || true)"
+          latest=$(ls -1t agent_outbox 2>/dev/null | head -n 1 || true)
           if [ -z "$latest" ]; then
             echo "No files in agent_outbox."
             exit 0
           fi
 
           echo "Latest: $latest"
-          content="$(cat "agent_outbox/$latest")"
+          content=$(cat "agent_outbox/$latest")
 
-          action="$(echo "$content" | python -c "import sys,json; print(json.load(sys.stdin).get('action',''))")"
+          action=$(echo "$content" | python -c "import sys,json; print(json.load(sys.stdin).get('action',''))")
           if [ "$action" != "write_result" ]; then
             echo "Action is '$action' (not write_result). Nothing to do."
             exit 0
           fi
 
-          out_path="$(echo "$content" | python -c "import sys,json; print(json.load(sys.stdin).get('out_path','agent_results/result.txt'))")"
-          out_content="$(echo "$content" | python -c "import sys,json; print(json.load(sys.stdin).get('out_content',''))")"
+          out_path=$(echo "$content" | python -c "import sys,json; print(json.load(sys.stdin).get('out_path','agent_results/result.txt'))")
+          out_content=$(echo "$content" | python -c "import sys,json; print(json.load(sys.stdin).get('out_content',''))")
 
           mkdir -p "$(dirname "$out_path")"
           printf "%s\n" "$out_content" > "$out_path"
