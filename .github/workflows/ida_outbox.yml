@@ -2,7 +2,8 @@ name: IDA Outbox Runner
 
 on:
   push:
-    branches: [ main ]
+    branches: 
+      - main
     paths:
       - "agent_outbox/**"
 
@@ -22,34 +23,33 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-
           echo "=== agent_outbox contents ==="
           ls -la agent_outbox || true
-
+          
           latest="$(ls -1t agent_outbox 2>/dev/null | head -n 1 || true)"
           if [ -z "$latest" ]; then
             echo "No files found in agent_outbox."
             exit 0
           fi
-
+          
           echo "Latest: $latest"
           content="$(cat "agent_outbox/$latest")"
-
+          
           # Parse action (default empty)
-          action="$(echo "$content" | python -c "import sys,json; print(json.load(sys.stdin).get('action',''))" || true)"
+          action="$(echo "$content" | python3 -c "import sys,json; print(json.load(sys.stdin).get('action',''))" || true)"
           echo "Action: $action"
-
+          
           if [ "$action" != "write_result" ]; then
             echo "Not a write_result job. Nothing to do."
             exit 0
           fi
-
-          out_path="$(echo "$content" | python -c "import sys,json; print(json.load(sys.stdin).get('out_path','agent_results/result.txt'))")"
-          out_content="$(echo "$content" | python -c "import sys,json; print(json.load(sys.stdin).get('out_content',''))")"
-
+          
+          out_path="$(echo "$content" | python3 -c "import sys,json; print(json.load(sys.stdin).get('out_path','agent_results/result.txt'))")"
+          out_content="$(echo "$content" | python3 -c "import sys,json; print(json.load(sys.stdin).get('out_content',''))")"
+          
           mkdir -p "$(dirname "$out_path")"
           printf "%s\n" "$out_content" > "$out_path"
-
+          
           echo "Wrote: $out_path"
           echo "----"
           cat "$out_path"
@@ -60,7 +60,7 @@ jobs:
           set -euo pipefail
           git config user.name "ida-outbox-bot"
           git config user.email "ida-outbox-bot@users.noreply.github.com"
-
+          
           if [ -n "$(git status --porcelain)" ]; then
             git add -A
             git commit -m "IDA: write_result output"
