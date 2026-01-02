@@ -1,0 +1,5 @@
+{
+  "action": "write_result",
+  "out_path": "agent_results/hello.txt",
+  "out_content": "IDA lever. Hvis du leser dette, funker broen."
+}
