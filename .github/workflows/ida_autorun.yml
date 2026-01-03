@@ -1,0 +1,54 @@
+name: IDA AutoRun (job generator)
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate_job_if_empty:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure agent_outbox exists
+        run: mkdir -p agent_outbox
+
+      - name: Check if recent job exists (last 60 min)
+        id: check
+        run: |
+          set -e
+          RECENT=$(find agent_outbox -type f -name "job-*.json" -mmin -60 | wc -l | tr -d ' ')
+          echo "recent=$RECENT" >> $GITHUB_OUTPUT
+
+      - name: Create autonomous ROI job
+        if: steps.check.outputs.recent == '0'
+        run: |
+          TS=$(date -u +"%Y%m%d-%H%M%S")
+          cat > "agent_outbox/job-autogen-$TS.json" << 'EOF'
+          {
+            "task": "ROI_SCAN",
+            "rules": [
+              "No selling IDA",
+              "No 'published/committed' claims without SHA+link",
+              "Output must be concrete repo actions (files/paths), not ideas"
+            ],
+            "deliverables": [
+              "agent_results/ROI_PLAN.md",
+              "ops/logs/AUTORUN_LOG.md"
+            ],
+            "focus": [
+              "global markets + arbitrage opportunities",
+              "news/finance intelligence engine (not just social media)",
+              "3 parallel revenue engines, lowest effort first"
+            ]
+          }
+          EOF
+          git add agent_outbox
+          git config user.name "ida-autopilot"
+          git config user.email "ida-autopilot@users.noreply.github.com"
+          git commit -m "IDA autopilot: generate ROI_SCAN job" || exit 0
+          git push
