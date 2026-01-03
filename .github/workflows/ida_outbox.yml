@@ -3,48 +3,44 @@ name: IDA Outbox Runner
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:
+    paths:
+      - "agent_outbox/**"
+      - "tools/**"
+      - ".github/workflows/ida_outbox.yml"
+
+permissions:
+  contents: write
 
 jobs:
-  outbox:
+  run:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Debug list outbox
-        shell: bash
         run: |
           echo "=== agent_outbox ==="
           ls -la agent_outbox || true
 
-      - name: Pick job-test.json (forced)
+      - name: Pick latest JSON
         id: pick
         shell: bash
         run: |
           set -e
-          latest="agent_outbox/job-test.json"
-          echo "LATEST=$latest" >> "$GITHUB_ENV"
-          echo "Forced: $latest"
+          latest="$(ls -1t agent_outbox/*.json 2>/dev/null | head -n 1 || true)"
+          echo "LATEST=$latest" >> $GITHUB_ENV
+          echo "Latest: ${latest:-<none>}"
 
       - name: Run outbox runner
-        shell: bash
         run: |
           set -e
           if [ -z "${LATEST:-}" ]; then
             echo "No outbox JSON found. Exit."
             exit 0
           fi
-          if [ ! -f "$LATEST" ]; then
-            echo "Forced file not found: $LATEST"
-            ls -la agent_outbox || true
-            exit 1
-          fi
           python3 tools/outbox_runner.py "$LATEST"
 
       - name: Commit results back
-        shell: bash
         run: |
           set -e
           git config user.name "ida-outbox-bot"
