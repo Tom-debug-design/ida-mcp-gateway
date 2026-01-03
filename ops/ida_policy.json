@@ -1,0 +1,73 @@
+{
+  "policy_version": "1.0",
+  "default_mode": "autopilot",
+  "principles": [
+    "Maximize forward progress",
+    "Avoid loops and repeated failed attempts",
+    "Prefer permanent fixes over temporary patches",
+    "Optimize for income and ROI first"
+  ],
+  "scope": {
+    "managed_repos": [
+      "external/atomicbot-agent",
+      "external/PureBloomWorld-site"
+    ],
+    "read_write": true
+  },
+  "autonomy_model": {
+    "green_zone_auto": [
+      "docs",
+      "agent_results",
+      "ops/logs",
+      "content_text",
+      "seo_metadata",
+      "structured_data",
+      "internal_links",
+      "broken_links_fix",
+      "copy_improvements"
+    ],
+    "yellow_zone_budgeted": {
+      "max_commits_per_repo_per_day": 10,
+      "max_files_per_commit": 10,
+      "max_lines_per_commit": 500,
+      "must_log_every_commit": true
+    },
+    "red_zone_requires_approval": [
+      ".github/workflows/**",
+      "**/.env",
+      "**/.env.*",
+      "**/secrets*",
+      "**/*token*",
+      "**/*key*",
+      "**/package.json",
+      "**/package-lock.json",
+      "**/pnpm-lock.yaml",
+      "**/yarn.lock",
+      "**/requirements.txt",
+      "**/poetry.lock",
+      "**/Pipfile",
+      "**/Gemfile",
+      "**/go.mod",
+      "**/Cargo.toml",
+      "**/Dockerfile",
+      "**/docker-compose.yml",
+      "**/railway.json",
+      "**/render.yaml",
+      "**/*trading*",
+      "**/*payment*",
+      "external/atomicbot-agent/**"
+    ]
+  },
+  "execution_rules": {
+    "no_infinite_loops": true,
+    "if_failure_repeat_limit": 2,
+    "on_repeat_failure": "stop_and_write_root_cause_report",
+    "always_write_outputs_to": "agent_results/",
+    "always_log_to": "ops/logs/YYYY-MM-DD.md",
+    "commit_message_prefix": "IDA:"
+  },
+  "reporting": {
+    "daily_summary_required": true,
+    "daily_summary_path": "agent_results/DAILY_SUMMARY.md"
+  }
+}
