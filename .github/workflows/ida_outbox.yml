@@ -1,8 +1,62 @@
-- name: Pick job-test.json
-  id: pick
-  shell: bash
-  run: |
-    set -e
-    latest="agent_outbox/job-test.json"
-    echo "LATEST=$latest" >> $GITHUB_ENV
-    echo "Forced: $latest"
+name: IDA Outbox Runner
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  outbox:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Debug list outbox
+        shell: bash
+        run: |
+          echo "=== agent_outbox ==="
+          ls -la agent_outbox || true
+
+      - name: Pick job-test.json (forced)
+        id: pick
+        shell: bash
+        run: |
+          set -e
+          latest="agent_outbox/job-test.json"
+          echo "LATEST=$latest" >> "$GITHUB_ENV"
+          echo "Forced: $latest"
+
+      - name: Run outbox runner
+        shell: bash
+        run: |
+          set -e
+          if [ -z "${LATEST:-}" ]; then
+            echo "No outbox JSON found. Exit."
+            exit 0
+          fi
+          if [ ! -f "$LATEST" ]; then
+            echo "Forced file not found: $LATEST"
+            ls -la agent_outbox || true
+            exit 1
+          fi
+          python3 tools/outbox_runner.py "$LATEST"
+
+      - name: Commit results back
+        shell: bash
+        run: |
+          set -e
+          git config user.name "ida-outbox-bot"
+          git config user.email "ida-outbox-bot@users.noreply.github.com"
+
+          echo "=== git status ==="
+          git status --porcelain || true
+
+          if git status --porcelain | grep -q .; then
+            git add -A
+            git commit -m "IDA v2: write_result output"
+            git push
+          else
+            echo "No changes to commit."
+          fi
