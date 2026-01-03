@@ -1,18 +1,8 @@
-name: IDA Outbox Runner
-
-on:
-  push:
-    branches: [ main ]
-
-jobs:
-  smoke:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - run: |
-          echo "Runner OK"
-          ls -la agent_outbox || true
-      - name: Show latest outbox file
-        run: |
-          ls -1t agent_outbox 2>/dev/null | head -n 1 || echo "No outbox files"
+- name: Pick job-test.json
+  id: pick
+  shell: bash
+  run: |
+    set -e
+    latest="agent_outbox/job-test.json"
+    echo "LATEST=$latest" >> $GITHUB_ENV
+    echo "Forced: $latest"
