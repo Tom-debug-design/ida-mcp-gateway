@@ -17,7 +17,7 @@ jobs:
       - name: Ensure agent_outbox exists
         run: mkdir -p agent_outbox
 
-      - name: Check if recent job exists (last 60 min)
+      - name: Check if pending job exists (last 0 min)
         id: check
         run: |
           set -e
