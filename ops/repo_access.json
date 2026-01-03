@@ -1,0 +1,10 @@
+{
+  "action": "run_policy_cycle",
+  "cycle": "NR2",
+  "goals": [
+    "Generate verified repo snapshot",
+    "Create 7-day income plan",
+    "Produce P0/P1 todo list",
+    "Auto-implement green-zone P0 items within budget"
+  ]
+}
