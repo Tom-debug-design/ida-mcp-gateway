@@ -1,5 +1,7 @@
 {
   "action": "write_result",
+  "path": "agent_results/hello.txt",
+  "content": "IDA leverer: output skrevet.",
   "out_path": "agent_results/hello.txt",
-  "out_content": "IDA lever – TEST 02 – hvis du ser dette er broen LIVE"
+  "out_content": "IDA leverer: output skrevet."
 }
