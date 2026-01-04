@@ -1,16 +1,13 @@
 name: IDA Job Generator (A1)
 
 on:
-  workflow_dispatch:
   schedule:
     - cron: "*/5 * * * *"
-
-permissions:
-  contents: write
+  workflow_dispatch:
 
 concurrency:
   group: ida-job-generator
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   generate:
@@ -18,92 +15,58 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Guardrails
+      - name: A1 Guardrails (safe)
         shell: bash
         run: |
           set -e
+
           mkdir -p agent_outbox ops/logs ops/flags
 
+          # Kill switch
           if [ -f "ops/flags/STOP_AUTOPILOT" ]; then
             echo "STOP_AUTOPILOT present – exiting"
             exit 0
           fi
 
-          PENDING=$(ls agent_outbox/*.json 2>/dev/null | wc -l | tr -d ' ')
+          # Count pending jobs SAFELY
+          PENDING=$(find agent_outbox -maxdepth 1 -name "*.json" | wc -l | tr -d ' ')
+
+          echo "Pending jobs: $PENDING"
+
           if [ "$PENDING" -ge 3 ]; then
-            echo "Backlog cap reached"
+            echo "Backlog cap reached – skipping generation"
             exit 0
           fi
 
-      - name: Generate job
+      - name: Generate job JSON
         shell: bash
         run: |
-          set -e
-          TS=$(date -u +%Y%m%d-%H%M%S)
-          FILE="agent_outbox/job-autogen-${TS}.json"
+          TS=$(date -u +"%Y%m%d-%H%M%S")
+          JOB="agent_outbox/job-autogen-$TS.json"
 
-          python <<'PY'
-          import json, time, uuid, os
-          ts = time.strftime("%Y%m%d-%H%M%S", time.gmtime())
-          payload = {
-            "id": f"job-autogen-{ts}",
-            "created_utc": ts,
-            "type": "ROI_SCAN",
-            "priority": "A1",
+          cat > "$JOB" <<EOF
+          {
+            "task": "ROI_SCAN",
+            "priority": "normal",
+            "created_utc": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
             "rules": [
-              "No selling IDA",
-              "No committed claims without SHA",
-              "Concrete repo output only"
-            ],
-            "deliverables": [
-              "agent_results/ROI_PLAN.md",
-              "ops/logs/AUTORUN_LOG.md"
-            ],
-            "meta": {
-              "nonce": str(uuid.uuid4()),
-              "generator": "A1"
-            }
+              "ROI only",
+              "Concrete repo actions only",
+              "No ideas, no theory"
+            ]
           }
-          os.makedirs("agent_outbox", exist_ok=True)
-          with open(os.environ["FILE"], "w") as f:
-            json.dump(payload, f, indent=2)
-          PY
+          EOF
 
-      - name: Commit safely (rebase + retry)
+          echo "Generated $JOB"
+
+      - name: Commit job (safe)
         shell: bash
         run: |
-          set -e
+          git config user.name "ida-outbox-bot"
+          git config user.email "ida@bot.local"
 
-          git config user.name "ida-autopilot"
-          git config user.email "ida-autopilot@users.noreply.github.com"
-
-          git add agent_outbox/*.json ops/logs || true
-
-          if git diff --cached --quiet; then
-            echo "Nothing to commit"
-            exit 0
-          fi
-
-          git commit -m "A1: generate job" || true
-
-          for i in 1 2 3; do
-            echo "Push attempt $i"
-            git fetch origin main
-            git rebase origin/main || git rebase --abort
-            if git push origin main; then
-              echo "Push succeeded"
-              exit 0
-            fi
-            sleep 2
-          done
-
-          echo "Push failed after retries – skipping without failing workflow"
-          exit 0
+          git add agent_outbox/*.json
+          git commit -m "IDA A1: generate job" || exit 0
+          git pull --rebase
+          git push
