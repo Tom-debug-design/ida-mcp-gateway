@@ -83,3 +83,7 @@
 [2026-01-04 21:34:09 UTC] Job OK: job-autogen-20260104-213235.json
 [2026-01-04 21:34:09 UTC] Run complete. processed=1
 [2026-01-04 21:45:15 UTC] No jobs in outbox. Exiting.
+[2026-01-04 21:53:59 UTC] Start run. budget=120s, jobs_in_outbox=1
+[2026-01-04 21:53:59 UTC] Picked job FIFO: job-autogen-20260104-214614.json
+[2026-01-04 21:53:59 UTC] Job OK: job-autogen-20260104-214614.json
+[2026-01-04 21:53:59 UTC] Run complete. processed=1
