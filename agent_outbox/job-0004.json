@@ -1,9 +1,0 @@
-{
-  "job_id": "job-0004",
-  "source": "IDA",
-  "type": "command",
-  "action": "write_result",
-  "out_path": "agent_results/job-0004.txt",
-  "out_content": "✅ IDA executed job-0004 and wrote this back via GitHub Actions.\nTimestamp: (set by runner)\n",
-  "created_at": "2026-01-01T23:10:00Z"
-}

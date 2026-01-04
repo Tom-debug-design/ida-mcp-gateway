@@ -1,5 +1,0 @@
-{
-  "action": "write_result",
-  "out_path": "agent_results/PRODUCTION_START.md",
-  "out_content": "# IDA – PRODUKSJON STARTET\n\nStatus: LIVE\nDato: Automatisk via GitHub Actions\n\nDette markerer start på produksjonsløp.\n\nNeste steg:\n- Motta reelle jobber\n- Prosessere dem deterministisk\n- Skrive resultater tilbake til repo\n"
-}
