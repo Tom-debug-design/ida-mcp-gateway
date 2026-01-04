@@ -2,8 +2,11 @@ name: IDA Job Generator (A1)
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
-  workflow_dispatch:
+    - cron: "*/5 * * * *"   # hver 5. minutt
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
 
 concurrency:
   group: ida-job-generator
@@ -12,36 +15,22 @@ concurrency:
 jobs:
   generate:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: A1 Guardrails (safe)
-  shell: bash
-  run: |
-    set -e
+        shell: bash
+        run: |
+          set -e
+          mkdir -p agent_outbox ops/logs ops/flags
 
-    mkdir -p agent_outbox ops/logs ops/flags
+          if [ -f "ops/flags/STOP_AUTOPILOT" ]; then
+            echo "STOP_AUTOPILOT present – exiting"
+            exit 0
+          fi
 
-    if [ -f "ops/flags/STOP_AUTOPILOT" ]; then
-      echo "STOP_AUTOPILOT present – exiting"
-      exit 0
-    fi
-
-    # SAFE count (never fails if empty)
-    PENDING=$(find agent_outbox -maxdepth 1 -type f -name "*.json" | wc -l | tr -d ' ')
-
-    echo "Pending jobs: $PENDING"
-
-    if [ "$PENDING" -ge 3 ]; then
-      echo "Backlog cap reached – skipping generation"
-      exit 0
-    fi
-
-
-          # Count pending jobs SAFELY
-          PENDING=$(find agent_outbox -maxdepth 1 -name "*.json" | wc -l | tr -d ' ')
-
+          PENDING=$(find agent_outbox -maxdepth 1 -type f -name "*.json" | wc -l | tr -d ' ')
           echo "Pending jobs: $PENDING"
 
           if [ "$PENDING" -ge 3 ]; then
@@ -49,34 +38,76 @@ jobs:
             exit 0
           fi
 
-      - name: Generate job JSON
+      - name: Generate job JSON into agent_outbox/
         shell: bash
         run: |
+          set -e
           TS=$(date -u +"%Y%m%d-%H%M%S")
-          JOB="agent_outbox/job-autogen-$TS.json"
+          JOB="agent_outbox/job-autogen-${TS}.json"
 
-          cat > "$JOB" <<EOF
+          cat > "$JOB" <<'JSON'
           {
             "task": "ROI_SCAN",
-            "priority": "normal",
-            "created_utc": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
             "rules": [
-              "ROI only",
-              "Concrete repo actions only",
-              "No ideas, no theory"
+              "No selling IDA",
+              "No 'published/committed' claims without SHA+link",
+              "Output must be concrete repo actions (files/paths), not ideas"
+            ],
+            "deliverables": [
+              "agent_results/ROI_PLAN.md",
+              "ops/logs/AUTORUN_LOG.md"
+            ],
+            "focus": [
+              "global markets + arbitrage opportunities",
+              "news/finance intelligence engine (not just social media)",
+              "3 parallel revenue engines, lowest effort first"
             ]
           }
-          EOF
+          JSON
 
-          echo "Generated $JOB"
+          echo "Created $JOB"
+          ls -la agent_outbox || true
 
-      - name: Commit job (safe)
+      - name: Commit job into repo (safe)
         shell: bash
         run: |
+          set -e
           git config user.name "ida-outbox-bot"
-          git config user.email "ida@bot.local"
+          git config user.email "ida-outbox-bot@users.noreply.github.com"
 
-          git add agent_outbox/*.json
-          git commit -m "IDA A1: generate job" || exit 0
-          git pull --rebase
-          git push
+          git add agent_outbox/*.json ops/logs ops/flags || true
+          git commit -m "IDA A1: generate job" || { echo "Nothing to commit"; exit 0; }
+
+          # rebase + retry push (handles non-fast-forward)
+          for i in 1 2 3; do
+            git pull --rebase origin main || true
+            if git push origin HEAD:main; then
+              echo "Push ok"
+              exit 0
+            fi
+            echo "Push failed, retrying ($i/3) ..."
+            sleep 2
+          done
+          echo "Push failed after retries"
+          exit 1
+
+      - name: Write ops log entry
+        shell: bash
+        run: |
+          set -e
+          TS=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          echo "[$TS] A1 generated job" >> ops/logs/AUTORUN_LOG.md
+
+          git config user.name "ida-outbox-bot"
+          git config user.email "ida-outbox-bot@users.noreply.github.com"
+          git add ops/logs/AUTORUN_LOG.md || true
+          git commit -m "IDA ops: log A1 tick" || exit 0
+
+          for i in 1 2 3; do
+            git pull --rebase origin main || true
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            sleep 2
+          done
+          exit 0
