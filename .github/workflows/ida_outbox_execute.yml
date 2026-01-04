@@ -1,0 +1,38 @@
+name: IDA Outbox Executor
+
+on:
+  push:
+    paths:
+      - agent_outbox/**/*.json
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  run_outbox:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install requirements
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run outbox executor
+        run: |
+          python tools/outbox_runner.py
+
+      - name: Commit results
+        run: |
+          git config user.name "ida-autopilot"
+          git config user.email "ida-autopilot@users.noreply.github.com"
+          git add agent_results ops || true
+          git commit -m "IDA executor: apply outbox job" || exit 0
+          git push
