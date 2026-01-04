@@ -2,31 +2,31 @@ name: IDA Outbox Runner
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [ main ]
     paths:
       - "agent_outbox/**"
       - "tools/**"
       - ".github/workflows/ida_outbox.yml"
-
-  # "Evighetsjobben": kjør automatisk hvert 5. minutt
+  workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
-
-  # Manuell start hvis du vil teste fra UI
-  workflow_dispatch: {}
+    - cron: "*/5 * * * *"  # A1: poll hvert 5. min (juster senere)
 
 permissions:
   contents: write
 
+# 🔒 A1-lås: kun én run om gangen på main.
 concurrency:
-  group: ida-outbox-runner
+  group: ida-outbox-main
   cancel-in-progress: false
 
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -38,45 +38,69 @@ jobs:
       - name: Install deps (if any)
         run: |
           set -e
-          if [ -f requirements.txt ]; then
-            python -m pip install --upgrade pip
-            pip install -r requirements.txt
-          else
-            echo "No requirements.txt found, skipping pip install."
-          fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
       - name: Debug list outbox
         run: |
           set -e
-          echo "=== ls agent_outbox ==="
+          echo "== agent_outbox contents =="
           ls -la agent_outbox || true
-          echo "=== find agent_outbox (maxdepth 2) ==="
-          find agent_outbox -maxdepth 2 -type f -print || true
+          echo "== JSON jobs =="
+          ls -la agent_outbox/*.json 2>/dev/null || true
 
       - name: Run outbox runner
+        env:
+          PYTHONUNBUFFERED: "1"
         run: |
           set -e
           python tools/outbox_runner.py
 
-      - name: Commit results back
-        shell: bash
+      - name: Commit results back (safe)
+        env:
+          GIT_AUTHOR_NAME: ida-outbox-bot
+          GIT_AUTHOR_EMAIL: ida-outbox-bot@users.noreply.github.com
+          GIT_COMMITTER_NAME: ida-outbox-bot
+          GIT_COMMITTER_EMAIL: ida-outbox-bot@users.noreply.github.com
         run: |
           set -e
 
-          echo "=== git status ==="
-          git status --porcelain || true
+          git config user.name  "ida-outbox-bot"
+          git config user.email "ida-outbox-bot@users.noreply.github.com"
 
-          # If nothing changed, do nothing (important for schedule runs)
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "No changes to commit. Exiting cleanly."
+          # Hvis ingenting endret -> ferdig.
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No changes to commit."
             exit 0
           fi
 
-          git config user.name "ida-outbox-bot"
-          git config user.email "ida-outbox-bot@users.noreply.github.com"
+          # Retry loop for non-fast-forward / transient push issues
+          for i in 1 2 3 4 5; do
+            echo "Attempt $i: syncing with origin/main"
+            git fetch origin main
 
-          git add agent_results ops agent_outbox || true
+            # Rebase lokal commit på toppen av origin/main (unngår non-fast-forward)
+            git pull --rebase origin main || true
 
-          # Commit message: keep it simple + consistent
-          git commit -m "IDA: outbox tick" || exit 0
-          git push
+            # Stage alt (runner skriver gjerne logs/resultater)
+            git add -A
+
+            # Hvis rebase/pull gjorde at vi endte uten endringer
+            if git diff --cached --quiet; then
+              echo "No staged changes after rebase."
+              exit 0
+            fi
+
+            git commit -m "IDA: outbox tick" || true
+
+            echo "Attempt $i: pushing..."
+            if git push origin HEAD:main; then
+              echo "Push succeeded."
+              exit 0
+            fi
+
+            echo "Push failed, backing off..."
+            sleep $((i * 2))
+          done
+
+          echo "ERROR: push failed after retries"
+          exit 1
