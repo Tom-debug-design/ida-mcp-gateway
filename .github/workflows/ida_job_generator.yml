@@ -1,0 +1,158 @@
+name: IDA Job Generator (A1)
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Hvert 5. minutt (kan strammes inn senere)
+    - cron: "*/5 * * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ida-job-generator
+  cancel-in-progress: true
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Guardrails (kill-switch + backlog cap)
+        shell: bash
+        run: |
+          set -e
+
+          echo "=== A1 Guardrails ==="
+
+          # Kill-switch (lag denne fila i repoet for å stoppe generatoren)
+          if [ -f "ops/flags/STOP_AUTOPILOT" ]; then
+            echo "STOP_AUTOPILOT flag is present. Exiting cleanly."
+            exit 0
+          fi
+
+          mkdir -p agent_outbox ops/flags ops/logs
+
+          # Backlog cap: hvis for mange jobber ligger i outbox, ikke lag flere
+          # (hindrer spam/loop)
+          PENDING_COUNT=$(ls -1 agent_outbox/*.json 2>/dev/null | wc -l | tr -d ' ')
+          echo "Pending jobs in agent_outbox: $PENDING_COUNT"
+
+          MAX_PENDING=3
+          if [ "$PENDING_COUNT" -ge "$MAX_PENDING" ]; then
+            echo "Backlog cap reached (>= $MAX_PENDING). Not generating new job."
+            exit 0
+          fi
+
+      - name: Generate job JSON into agent_outbox/
+        shell: bash
+        run: |
+          set -e
+
+          TS="$(date -u +%Y%m%d-%H%M%S)"
+          JOB_ID="job-autogen-${TS}"
+          OUTFILE="agent_outbox/${JOB_ID}.json"
+
+          echo "=== Generating job: ${JOB_ID} ==="
+
+          python - <<'PY'
+          import json, os, time, uuid
+
+          ts = time.strftime("%Y%m%d-%H%M%S", time.gmtime())
+          job_id = f"job-autogen-{ts}"
+          out = f"agent_outbox/{job_id}.json"
+
+          payload = {
+            "id": job_id,
+            "created_utc": ts,
+            "type": "ROI_SCAN",
+            "priority": "A1",
+            "rules": [
+              "No selling IDA",
+              "No 'published/committed' claims without SHA+link",
+              "Output must be concrete repo actions (files/paths), not ideas",
+              "If stuck, write reason + next action"
+            ],
+            "deliverables": [
+              "agent_results/ROI_PLAN.md",
+              "ops/logs/AUTORUN_LOG.md"
+            ],
+            "focus": [
+              "3 parallel revenue engines, lowest effort first",
+              "news/finance intelligence engine (not just social media)",
+              "global markets + arbitrage opportunities"
+            ],
+            "meta": {
+              "nonce": str(uuid.uuid4()),
+              "generator": "ida_job_generator.yml",
+              "version": "A1"
+            }
+          }
+
+          os.makedirs("agent_outbox", exist_ok=True)
+          with open(out, "w", encoding="utf-8") as f:
+            json.dump(payload, f, indent=2, ensure_ascii=False)
+
+          print(f"Wrote {out}")
+          PY
+
+          echo "Job file created: $OUTFILE"
+          ls -la agent_outbox | tail -n +1
+
+      - name: Commit job into repo
+        shell: bash
+        run: |
+          set -e
+
+          echo "=== git status BEFORE ==="
+          git status --porcelain || true
+
+          # sync (unngår non-fast-forward)
+          git fetch origin main
+
+          # rebase lokalt hvis nødvendig
+          git rebase origin/main || (git rebase --abort && echo "Rebase failed, continuing without rebase")
+
+          echo "=== git status AFTER rebase ==="
+          git status --porcelain || true
+
+          git add agent_outbox/*.json ops/logs || true
+
+          # Hvis ingenting å committe, exit
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+            exit 0
+          fi
+
+          git config user.name "ida-autopilot"
+          git config user.email "ida-autopilot@users.noreply.github.com"
+
+          git commit -m "A1: generate new outbox job"
+          git push origin main
+
+      - name: Write ops log entry
+        shell: bash
+        run: |
+          set -e
+          mkdir -p ops/logs
+          echo "[$(date -u +%Y-%m-%dT%H:%M:%SZ)] A1 generator ran" >> ops/logs/AUTORUN_LOG.md
+
+          git add ops/logs/AUTORUN_LOG.md || true
+          if git diff --cached --quiet; then
+            echo "No log changes to commit."
+            exit 0
+          fi
+
+          git config user.name "ida-autopilot"
+          git config user.email "ida-autopilot@users.noreply.github.com"
+          git commit -m "A1: autorun log"
+          git push origin main
