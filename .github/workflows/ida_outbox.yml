@@ -2,57 +2,81 @@ name: IDA Outbox Runner
 
 on:
   push:
-    branches: [ main ]
+    branches: [ "main" ]
     paths:
       - "agent_outbox/**"
       - "tools/**"
       - ".github/workflows/ida_outbox.yml"
 
+  # "Evighetsjobben": kjør automatisk hvert 5. minutt
+  schedule:
+    - cron: "*/5 * * * *"
+
+  # Manuell start hvis du vil teste fra UI
+  workflow_dispatch: {}
+
 permissions:
   contents: write
+
+concurrency:
+  group: ida-outbox-runner
+  cancel-in-progress: false
 
 jobs:
   run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps (if any)
+        run: |
+          set -e
+          if [ -f requirements.txt ]; then
+            python -m pip install --upgrade pip
+            pip install -r requirements.txt
+          else
+            echo "No requirements.txt found, skipping pip install."
+          fi
 
       - name: Debug list outbox
         run: |
-          echo "=== agent_outbox ==="
-          ls -la agent_outbox || true
-
-      - name: Pick latest JSON
-        id: pick
-        shell: bash
-        run: |
           set -e
-          latest="$(ls -1t agent_outbox/*.json 2>/dev/null | head -n 1 || true)"
-          echo "LATEST=$latest" >> $GITHUB_ENV
-          echo "Latest: ${latest:-<none>}"
+          echo "=== ls agent_outbox ==="
+          ls -la agent_outbox || true
+          echo "=== find agent_outbox (maxdepth 2) ==="
+          find agent_outbox -maxdepth 2 -type f -print || true
 
       - name: Run outbox runner
         run: |
           set -e
-          if [ -z "${LATEST:-}" ]; then
-            echo "No outbox JSON found. Exit."
-            exit 0
-          fi
-          python3 tools/outbox_runner.py "$LATEST"
+          python tools/outbox_runner.py
 
       - name: Commit results back
+        shell: bash
         run: |
           set -e
-          git config user.name "ida-outbox-bot"
-          git config user.email "ida-outbox-bot@users.noreply.github.com"
 
           echo "=== git status ==="
           git status --porcelain || true
 
-          if git status --porcelain | grep -q .; then
-            git add -A
-            git commit -m "IDA v2: write_result output"
-            git push
-          else
-            echo "No changes to commit."
+          # If nothing changed, do nothing (important for schedule runs)
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "No changes to commit. Exiting cleanly."
+            exit 0
           fi
+
+          git config user.name "ida-outbox-bot"
+          git config user.email "ida-outbox-bot@users.noreply.github.com"
+
+          git add agent_results ops agent_outbox || true
+
+          # Commit message: keep it simple + consistent
+          git commit -m "IDA: outbox tick" || exit 0
+          git push
