@@ -17,17 +17,27 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: A1 Guardrails (safe)
-        shell: bash
-        run: |
-          set -e
+  shell: bash
+  run: |
+    set -e
 
-          mkdir -p agent_outbox ops/logs ops/flags
+    mkdir -p agent_outbox ops/logs ops/flags
 
-          # Kill switch
-          if [ -f "ops/flags/STOP_AUTOPILOT" ]; then
-            echo "STOP_AUTOPILOT present – exiting"
-            exit 0
-          fi
+    if [ -f "ops/flags/STOP_AUTOPILOT" ]; then
+      echo "STOP_AUTOPILOT present – exiting"
+      exit 0
+    fi
+
+    # SAFE count (never fails if empty)
+    PENDING=$(find agent_outbox -maxdepth 1 -type f -name "*.json" | wc -l | tr -d ' ')
+
+    echo "Pending jobs: $PENDING"
+
+    if [ "$PENDING" -ge 3 ]; then
+      echo "Backlog cap reached – skipping generation"
+      exit 0
+    fi
+
 
           # Count pending jobs SAFELY
           PENDING=$(find agent_outbox -maxdepth 1 -name "*.json" | wc -l | tr -d ' ')
