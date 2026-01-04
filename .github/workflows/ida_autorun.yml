@@ -17,18 +17,19 @@ jobs:
       - name: Ensure agent_outbox exists
         run: mkdir -p agent_outbox
 
-      - name: Check if pending job exists (last 0 min)
+      - name: Check if pending job exists
         id: check
         run: |
           set -e
-          RECENT=$(find agent_outbox -type f -name "job-*.json" -mmin -60 | wc -l | tr -d ' ')
-          echo "recent=$RECENT" >> $GITHUB_OUTPUT
+          COUNT=$(find agent_outbox -type f -name "job-*.json" | wc -l | tr -d ' ')
+          echo "pending=$COUNT" >> $GITHUB_OUTPUT
 
       - name: Create autonomous ROI job
-        if: steps.check.outputs.recent == '0'
+        if: steps.check.outputs.pending == '0'
         run: |
+          set -e
           TS=$(date -u +"%Y%m%d-%H%M%S")
-          cat > "agent_outbox/job-autogen-$TS.json" << 'EOF'
+          cat > "agent_outbox/job-autogen-${TS}.json" << 'EOF'
           {
             "task": "ROI_SCAN",
             "rules": [
@@ -47,6 +48,7 @@ jobs:
             ]
           }
           EOF
+
           git add agent_outbox
           git config user.name "ida-autopilot"
           git config user.email "ida-autopilot@users.noreply.github.com"
