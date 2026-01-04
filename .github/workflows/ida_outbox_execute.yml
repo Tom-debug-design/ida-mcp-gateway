@@ -1,38 +1,60 @@
 name: IDA Outbox Executor
 
 on:
-  push:
-    paths:
-      - agent_outbox/**/*.json
   workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
 
 permissions:
   contents: write
 
+concurrency:
+  group: ida-outbox-executor
+  cancel-in-progress: false
+
 jobs:
-  run_outbox:
+  run-outbox:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: "3.11"
 
-      - name: Install requirements
+      - name: Install deps
         run: |
+          python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
 
-      - name: Run outbox executor
+      - name: Run outbox runner
         run: |
+          set -e
           python tools/outbox_runner.py
 
-      - name: Commit results
+      - name: Commit results back (safe rebase)
+        shell: bash
         run: |
+          set -e
+
           git config user.name "ida-autopilot"
           git config user.email "ida-autopilot@users.noreply.github.com"
-          git add agent_results ops || true
-          git commit -m "IDA executor: apply outbox job" || exit 0
-          git push
+
+          # Sync first to avoid non-fast-forward
+          git fetch origin main
+          git rebase origin/main || (git rebase --abort && git pull --rebase origin main)
+
+          # Stage only expected folders
+          git add agent_outbox agent_results ops || true
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+            exit 0
+          fi
+
+          git commit -m "IDA v2: write_result output"
+          git push origin HEAD:main
