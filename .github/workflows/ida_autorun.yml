@@ -1,69 +1,54 @@
-name: IDA AutoRun (job generator)
+name: IDA Outbox Runner v2
 
 on:
-  schedule:
-    - cron: "*/30 * * * *"
   workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"   # hver 5. min
 
 permissions:
   contents: write
 
 concurrency:
-  group: ida-main-writes
+  group: ida-outbox-runner
   cancel-in-progress: false
 
 jobs:
-  generate_job_if_empty:
+  run-outbox:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Ensure agent_outbox exists
-        run: mkdir -p agent_outbox
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-      - name: Check if pending job exists (last 60 min)
-        id: check
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+
+      - name: Run outbox runner
+        env:
+          RUN_BUDGET_SECONDS: "120"
+        run: |
+          python tools/outbox_runner.py
+
+      - name: Commit results back
         run: |
           set -e
-          RECENT=$(find agent_outbox -type f -name "job-*.json" -mmin -60 | wc -l | tr -d ' ')
-          echo "recent=$RECENT" >> "$GITHUB_OUTPUT"
-          echo "Found recent jobs: $RECENT"
-
-      - name: Create autonomous ROI job
-        if: steps.check.outputs.recent == '0'
-        run: |
-          set -e
-          TS=$(date -u +"%Y%m%d-%H%M%S")
-          cat > "agent_outbox/job-autogen-${TS}.json" << 'EOF'
-          {
-            "task": "ROI_SCAN",
-            "rules": [
-              "No selling IDA",
-              "No 'published/committed' claims without SHA+link",
-              "Output must be concrete repo actions (files/paths), not ideas"
-            ],
-            "deliverables": [
-              "agent_results/ROI_PLAN.md",
-              "ops/logs/AUTORUN_LOG.md"
-            ],
-            "focus": [
-              "global markets + arbitrage opportunities",
-              "news/finance intelligence engine (not just social media)",
-              "3 parallel revenue engines, lowest effort first"
-            ]
-          }
-          EOF
-
-          git add agent_outbox
           git config user.name "ida-autopilot"
           git config user.email "ida-autopilot@users.noreply.github.com"
-          git commit -m "IDA autopilot: generate ROI_SCAN job" || exit 0
 
+          git add agent_results ops agent_outbox || true
+          git commit -m "IDA: process outbox jobs" || true
+
+          # viktigste linja: dette stopper 'fetch first' helvete
           git pull --rebase origin main
-          git push origin main
 
-      - name: No-op (job already exists)
-        if: steps.check.outputs.recent != '0'
-        run: echo "Recent job exists, skipping creation."
+          git push origin main
