@@ -1,0 +1,60 @@
+{
+  "markets": [
+    {
+      "name": "AI Agents & Automation",
+      "focus": [
+        "autonomous agents",
+        "task orchestration",
+        "agent frameworks",
+        "long-running workflows"
+      ]
+    },
+    {
+      "name": "Free & Low-cost APIs",
+      "focus": [
+        "free tiers",
+        "new APIs",
+        "rate limits",
+        "data access"
+      ]
+    },
+    {
+      "name": "Affiliate & Traffic Systems",
+      "focus": [
+        "affiliate platforms",
+        "commission models",
+        "tracking changes",
+        "SEO automation",
+        "YouTube automation"
+      ]
+    },
+    {
+      "name": "DevOps & Hosting",
+      "focus": [
+        "Railway",
+        "Render",
+        "Vercel",
+        "CI/CD",
+        "GitHub Actions"
+      ]
+    },
+    {
+      "name": "E-commerce & Product Feeds",
+      "focus": [
+        "product feeds",
+        "dropshipping",
+        "supplier APIs",
+        "automation"
+      ]
+    },
+    {
+      "name": "Crypto & Trading Infrastructure",
+      "focus": [
+        "exchange APIs",
+        "market data",
+        "automation rules",
+        "risk tooling"
+      ]
+    }
+  ]
+}
