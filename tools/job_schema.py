@@ -45,10 +45,9 @@ def parse_job(raw: Dict[str, Any]) -> Job:
 
     if output is not None:
         _assert(isinstance(output, dict), "output must be an object if present")
-        # Optional but recommended: output.path
         if "path" in output:
-            _assert = output["path"]
-            _assert(isinstance(_R, str) and _R.strip(), "output.path must be a non-empty string")
+            p = output["path"]
+            _assert(isinstance(p, str) and p.strip(), "output.path must be a non-empty string")
 
     if meta is not None:
         _assert(isinstance(meta, dict), "meta must be an object if present")
