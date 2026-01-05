@@ -1,26 +1,90 @@
 {
-  "rules": {
-    "must_be": [
-      "new since last run",
-      "verifiable source",
-      "relevant to active markets"
-    ],
-    "value_tests": {
-      "speed": "Can this make IDA faster?",
-      "money": "Can this lead to revenue or cost reduction?",
-      "stability": "Does this reduce risk or failure points?",
-      "capability": "Does this unlock a new ability?"
-    },
-    "output_required": [
-      "short summary (max 5 lines)",
-      "why this matters",
-      "suggested next action"
-    ],
-    "ignore_if": [
-      "pure marketing",
-      "no concrete change",
-      "duplicate insight",
-      "no actionable outcome"
+  "version": "A4",
+  "mode": "read_only",
+  "output": {
+    "hypotheses_dir": "ops/hypotheses",
+    "needs_dir": "ops/needs",
+    "logs_dir": "ops/logs"
+  },
+  "focus": {
+    "markets": true,
+    "tools": true,
+    "free_apis": true,
+    "platform_updates": true
+  },
+  "guardrails": {
+    "no_write_actions": true,
+    "no_deploy": true,
+    "no_purchases": true,
+    "no_accounts": true,
+    "no_data_exfiltration": true,
+    "allowed_output_only": [
+      "ops/hypotheses",
+      "ops/needs",
+      "ops/logs",
+      "agent_results"
     ]
+  },
+  "hypothesis_format": {
+    "must_include": [
+      "title",
+      "why_it_matters",
+      "signal_to_watch",
+      "what_to_try_next",
+      "risk_level",
+      "confidence_0_100"
+    ],
+    "risk_levels": ["none", "low", "medium"],
+    "confidence_range": [0, 100]
+  },
+  "market_insight_rules": {
+    "pick_topics": [
+      "AI tooling / agents",
+      "affiliate / ecommerce",
+      "SEO / content automation",
+      "workflow automation (GitHub Actions, MCP, webhooks)",
+      "crypto/trading infra (ONLY read-only news)"
+    ],
+    "daily_limit": {
+      "max_topics": 3,
+      "max_sources_per_topic": 4
+    }
+  },
+  "tools_insight_rules": {
+    "what_to_search_for": [
+      "free api directories",
+      "cheap APIs with generous free tier",
+      "open-source tools that replace paid SaaS",
+      "automation tools that reduce manual work",
+      "MCP servers / connectors",
+      "scraping alternatives / SERP providers",
+      "logging/observability stacks"
+    ],
+    "tool_entry_format": {
+      "must_include": [
+        "name",
+        "category",
+        "what_it_does",
+        "why_useful_for_ida",
+        "cost_tier",
+        "integration_difficulty",
+        "link_domain_only"
+      ],
+      "cost_tiers": ["free", "freemium", "paid"],
+      "integration_difficulty_levels": ["easy", "medium", "hard"]
+    },
+    "daily_limit": {
+      "max_tools": 5
+    }
+  },
+  "needs_rules": {
+    "when_to_create_need": [
+      "missing API key required",
+      "missing domain in allowed list",
+      "missing repo permission",
+      "missing schema/format to proceed",
+      "missing data source"
+    ],
+    "need_file_prefix": "NEEDS_"
   }
 }
