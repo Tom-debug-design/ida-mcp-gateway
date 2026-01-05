@@ -1,0 +1,10 @@
+en.wikipedia.org
+news.ycombinator.com
+www.reddit.com
+old.reddit.com
+finance.yahoo.com
+www.investing.com
+www.kraken.com
+www.binance.com
+www.coinmarketcap.com
+www.coingecko.com
