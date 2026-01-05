@@ -117,3 +117,7 @@
 [2026-01-05 02:20:16 UTC] Picked job FIFO: job-autogen-20260105-005005.json
 [2026-01-05 02:20:16 UTC] Job OK: job-autogen-20260105-005005.json
 [2026-01-05 02:20:16 UTC] Run complete. processed=1
+[2026-01-05 04:05:31 UTC] Start run. budget=120s, jobs_in_outbox=1
+[2026-01-05 04:05:31 UTC] Picked job FIFO: job-autogen-20260105-030649.json
+[2026-01-05 04:05:31 UTC] Job OK: job-autogen-20260105-030649.json
+[2026-01-05 04:05:31 UTC] Run complete. processed=1
