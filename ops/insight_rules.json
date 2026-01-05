@@ -1,0 +1,26 @@
+{
+  "rules": {
+    "must_be": [
+      "new since last run",
+      "verifiable source",
+      "relevant to active markets"
+    ],
+    "value_tests": {
+      "speed": "Can this make IDA faster?",
+      "money": "Can this lead to revenue or cost reduction?",
+      "stability": "Does this reduce risk or failure points?",
+      "capability": "Does this unlock a new ability?"
+    },
+    "output_required": [
+      "short summary (max 5 lines)",
+      "why this matters",
+      "suggested next action"
+    ],
+    "ignore_if": [
+      "pure marketing",
+      "no concrete change",
+      "duplicate insight",
+      "no actionable outcome"
+    ]
+  }
+}
