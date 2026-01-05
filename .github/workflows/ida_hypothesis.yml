@@ -1,0 +1,141 @@
+name: IDA Hypothesis (A3)
+
+on:
+  schedule:
+    # Safe start: 1 gang pr dag. (Kan økes senere.)
+    - cron: "0 06 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  hypothesis:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Generate hypothesis report (read-only logic)
+        env:
+          INSIGHT_MODE: ${{ secrets.IDA_INSIGHT_MODE }}
+        run: |
+          python - <<'PY'
+          import os, json, glob, datetime
+
+          # Gate: bare kjør hvis du har slått på read-only innsikt
+          mode = (os.getenv("INSIGHT_MODE") or "").strip().lower()
+          if mode not in ("read_only", "readonly", "read-only"):
+              print(f"Skipping: IDA_INSIGHT_MODE is '{mode}' (set to read_only to enable)")
+              raise SystemExit(0)
+
+          now = datetime.datetime.utcnow()
+          stamp = now.strftime("%Y%m%d")
+          ts = now.strftime("%Y-%m-%d %H:%M UTC")
+
+          # Kilder vi kan lese uten nett:
+          result_files = sorted(glob.glob("agent_results/**/*.json", recursive=True) + glob.glob("agent_results/**/*.result.json", recursive=True))
+          outbox_files  = sorted(glob.glob("agent_outbox/*.json"))
+          ops_logs      = sorted(glob.glob("ops/logs/**/*.log", recursive=True) + glob.glob("ops/**/*.log", recursive=True))
+
+          # Enkle signaler (heuristikk) — A3 = hypoteser, ikke handling.
+          signals = {
+              "utc_time": ts,
+              "counts": {
+                  "agent_results": len(result_files),
+                  "agent_outbox": len(outbox_files),
+                  "ops_logs": len(ops_logs),
+              },
+              "recent": {
+                  "latest_results": result_files[-10:],
+                  "latest_outbox": outbox_files[-10:],
+                  "latest_logs": ops_logs[-5:],
+              },
+              "hypotheses": [],
+              "next_safe_actions": [],
+              "risks": []
+          }
+
+          # Hypotese-regler (enkle, men nyttige):
+          if len(outbox_files) > 20:
+              signals["hypotheses"].append("Outbox bygger seg opp: runner klarer ikke å tømme raskt nok.")
+              signals["next_safe_actions"].append("Øk runner-frekvens litt (f.eks. hver 10. min) eller reduser job-generator tempo.")
+              signals["risks"].append("Kø kan gi forsinket læring/feedback og større commit-støy.")
+
+          if len(result_files) == 0:
+              signals["hypotheses"].append("Ingen resultater generert ennå: enten kjører ikke runner, eller jobs blir ikke laget/oppdaget.")
+              signals["next_safe_actions"].append("Verifiser at agent_outbox får nye jobber OG at de flyttes til done/results.")
+              signals["risks"].append("Systemet kan se 'grønt' ut i Actions, men produsere null verdi.")
+
+          if len(result_files) > 0 and len(outbox_files) == 0:
+              signals["hypotheses"].append("Runner produserer resultater, men outbox er tom: job-generator kan være treg eller stoppet.")
+              signals["next_safe_actions"].append("Sjekk at A1-generatoren fortsatt kjører på schedule.")
+              signals["risks"].append("IDA blir 'reaktiv' i stedet for kontinuerlig.")
+
+          # “Market/Tool awareness” uten internett:
+          # Vi logger hva vi bør undersøke når web-tilgang aktiveres i senere steg.
+          signals["hypotheses"].append("Neste verdi-løft kommer fra web-innsikt: markeder + verktøy + gratis API-er.")
+          signals["next_safe_actions"].append("Når A4 aktiveres: whitelist flere relevante domener + start med 1-2 kilder pr kategori.")
+          signals["risks"].append("For mye web for tidlig = støy; hold det til få kilder i starten.")
+
+          # Skriv rapporter:
+          os.makedirs("ops", exist_ok=True)
+          os.makedirs("ops/hypotheses", exist_ok=True)
+          md_path = f"ops/hypotheses/HYPOTHESIS_{stamp}.md"
+          json_path = f"ops/hypotheses/HYPOTHESIS_{stamp}.json"
+
+          md = []
+          md.append(f"# IDA Hypothesis Report (A3) — {ts}")
+          md.append("")
+          md.append("## Signals (counts)")
+          md.append(f"- agent_results: {signals['counts']['agent_results']}")
+          md.append(f"- agent_outbox: {signals['counts']['agent_outbox']}")
+          md.append(f"- ops_logs: {signals['counts']['ops_logs']}")
+          md.append("")
+          md.append("## Hypotheses")
+          for h in signals["hypotheses"]:
+              md.append(f"- {h}")
+          md.append("")
+          md.append("## Next safe actions (no execution)")
+          for a in signals["next_safe_actions"]:
+              md.append(f"- {a}")
+          md.append("")
+          md.append("## Risks / watch-outs")
+          for r in signals["risks"]:
+              md.append(f"- {r}")
+          md.append("")
+          md.append("## Recent files (for debugging)")
+          md.append("### latest_results")
+          for f in signals["recent"]["latest_results"]:
+              md.append(f"- {f}")
+          md.append("### latest_outbox")
+          for f in signals["recent"]["latest_outbox"]:
+              md.append(f"- {f}")
+          md.append("### latest_logs")
+          for f in signals["recent"]["latest_logs"]:
+              md.append(f"- {f}")
+          md.append("")
+
+          with open(md_path, "w", encoding="utf-8") as f:
+              f.write("\n".join(md))
+
+          with open(json_path, "w", encoding="utf-8") as f:
+              json.dump(signals, f, ensure_ascii=False, indent=2)
+
+          print("Wrote:", md_path)
+          print("Wrote:", json_path)
+          PY
+
+      - name: Commit hypothesis report (safe)
+        run: |
+          git config user.name "ida-bot"
+          git config user.email "ida-bot@users.noreply.github.com"
+          git add ops/hypotheses || true
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "IDA A3: hypothesis report"
+          git push
