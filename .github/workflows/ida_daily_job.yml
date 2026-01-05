@@ -1,0 +1,50 @@
+name: IDA Daily Job (A2)
+
+on:
+  schedule:
+    # Hver dag kl 06:00 UTC (07:00 norsk vinter / 08:00 norsk sommer)
+    - cron: "0 6 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ida-daily-job-main
+  cancel-in-progress: false
+
+jobs:
+  create-daily-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create daily job JSON in agent_outbox
+        run: |
+          set -e
+          mkdir -p agent_outbox
+          TS="$(date -u +%Y%m%d-%H%M%S)"
+          FILE="agent_outbox/job-daily-${TS}.json"
+
+          cat > "$FILE" << 'JSON'
+          {
+            "id": "daily-report",
+            "type": "write_result",
+            "output_path": "DAILY.md",
+            "content": "# DAILY\n\n- date_utc: {{DATE_UTC}}\n- status: alive\n\n## Summary\n- outbox_jobs: {{OUTBOX_COUNT}}\n- last_run: {{LAST_RUN_UTC}}\n\n## Notes\n- Auto-generated daily marker.\n"
+          }
+          JSON
+
+          echo "Created $FILE"
+          git add agent_outbox
+
+      - name: Commit and push
+        run: |
+          set -e
+          git config user.name "ida-outbox-bot"
+          git config user.email "ida-outbox-bot@users.noreply.github.com"
+          git commit -m "IDA A2: queue daily job" || exit 0
+          git push
