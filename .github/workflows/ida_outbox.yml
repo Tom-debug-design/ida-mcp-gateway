@@ -7,14 +7,14 @@ on:
       - "agent_outbox/**"
       - "tools/**"
       - ".github/workflows/ida_outbox.yml"
+      - "requirements.txt"
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"  # A1: poll hvert 5. min (juster senere)
+    - cron: "*/5 * * * *"  # A1: poll hvert 5. min
 
 permissions:
   contents: write
 
-# 🔒 A1-lås: kun én run om gangen på main.
 concurrency:
   group: ida-outbox-main
   cancel-in-progress: false
@@ -35,10 +35,23 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install deps (if any)
+      - name: Install deps (requirements.txt)
         run: |
           set -e
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          python -V
+          python -m pip --version
+          python -m pip install --upgrade pip
+          if [ -f requirements.txt ]; then
+            python -m pip install -r requirements.txt
+          else
+            echo "No requirements.txt found - skipping install"
+          fi
+
+      - name: Verify imports (hard fail if missing)
+        run: |
+          set -e
+          python -c "import bs4; print('bs4 OK')"
+          python -c "import requests; print('requests OK')"
 
       - name: Debug list outbox
         run: |
@@ -64,27 +77,21 @@ jobs:
         run: |
           set -e
 
-          git config user.name  "ida-outbox-bot"
+          git config user.name "ida-outbox-bot"
           git config user.email "ida-outbox-bot@users.noreply.github.com"
 
-          # Hvis ingenting endret -> ferdig.
           if git diff --quiet && git diff --cached --quiet; then
             echo "No changes to commit."
             exit 0
           fi
 
-          # Retry loop for non-fast-forward / transient push issues
           for i in 1 2 3 4 5; do
             echo "Attempt $i: syncing with origin/main"
             git fetch origin main
-
-            # Rebase lokal commit på toppen av origin/main (unngår non-fast-forward)
             git pull --rebase origin main || true
 
-            # Stage alt (runner skriver gjerne logs/resultater)
             git add -A
 
-            # Hvis rebase/pull gjorde at vi endte uten endringer
             if git diff --cached --quiet; then
               echo "No staged changes after rebase."
               exit 0
