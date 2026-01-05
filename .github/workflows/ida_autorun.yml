@@ -1,29 +1,22 @@
-name: IDA Outbox Runner v2
+name: IDA AutoRun (Gateway)
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"   # hver 5. min
-
-permissions:
-  contents: write
+    - cron: "0 * * * *"   # hver time (UTC). Safe mode.
 
 concurrency:
-  group: ida-outbox-runner
+  group: ida-autorun
   cancel-in-progress: false
 
 jobs:
-  run-outbox:
+  ida:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
-
     steps:
-      - name: Checkout
+      - name: Checkout gateway repo
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Set up Python
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
@@ -31,24 +24,36 @@ jobs:
       - name: Install deps
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install openai requests
 
-      - name: Run outbox runner
+      - name: Run Job Generator
         env:
-          RUN_BUDGET_SECONDS: "120"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          MAX_JOBS_PER_RUN: "1"
+          JOB_GENERATE_INTERVAL_MIN: "60"
         run: |
-          python tools/outbox_runner.py
+          python worker/job_generator.py
 
-      - name: Commit results back
+      - name: Run Job Runner
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          MAX_JOBS_PER_RUN: "1"
         run: |
-          set -e
-          git config user.name "ida-autopilot"
-          git config user.email "ida-autopilot@users.noreply.github.com"
+          python worker/job_runner.py
 
-          git add agent_results ops agent_outbox || true
-          git commit -m "IDA: process outbox jobs" || true
+      - name: Publish results to target repos (atomicbot-agent + PureBloomWorld-site)
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          TARGET_REPOS: "Tom-debug-design/atomicbot-agent,Tom-debug-design/PureBloomWorld-site"
+        run: |
+          python worker/publish_results.py
 
-          # viktigste linja: dette stopper 'fetch first' helvete
-          git pull --rebase origin main
-
-          git push origin main
+      - name: Commit gateway outputs (logs/state)
+        run: |
+          git config user.name "ida-gateway-bot"
+          git config user.email "ida-gateway-bot@users.noreply.github.com"
+          git add -A
+          git commit -m "IDA: run + logs + state" || echo "No changes"
+          git push
