@@ -1,0 +1,6 @@
+{
+  "task": "ROI_SCAN",
+  "status": "ok",
+  "ts": "2026-01-05T05:45:26.638153Z",
+  "notes": "Executed by outbox_runner"
+}
