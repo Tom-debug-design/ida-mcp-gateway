@@ -1,0 +1,47 @@
+{
+  "job_id": "036093e5ae",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260106-223340.json",
+  "ran_at_utc": "2026-01-06T22:35:29.740262Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_collection",
+      "title": "Map Global News/Finance Data Sources",
+      "instructions": "List and validate APIs, RSS feeds, and web sources for real-time finance/news data. Output to config/markets.yaml.",
+      "created_at": "2026-01-06T22:35:29.740459Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "engineering",
+      "title": "Implement News/Finance Harvester",
+      "instructions": "Develop src/harvesters/news_finance.py to ingest, normalize, and store news/finance data. Log results in ops/logs/AUTORUN_LOG.md.",
+      "created_at": "2026-01-06T22:35:29.740463Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "engineering",
+      "title": "Build Arbitrage Scanner",
+      "instructions": "Create src/engines/arbitrage_scanner.py to detect price discrepancies across markets. Output actionable signals.",
+      "created_at": "2026-01-06T22:35:29.740465Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "documentation",
+      "title": "Draft Revenue Engine Models",
+      "instructions": "Document three revenue engines in docs/REVENUE_ENGINES.md, detailing data resale, subscription, and arbitrage execution.",
+      "created_at": "2026-01-06T22:35:29.740467Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "testing",
+      "title": "Write Unit Tests for Harvesters and Scanners",
+      "instructions": "Add tests in tests/ for news harvester and arbitrage scanner modules.",
+      "created_at": "2026-01-06T22:35:29.740468Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
