@@ -1,0 +1,68 @@
+{
+  "job_id": "7cf9491037",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260106-205727.json",
+  "ran_at_utc": "2026-01-06T21:10:16.020754Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_collection",
+      "title": "Global Market Data Feed Setup",
+      "instructions": "Implement scripts in /data/feeds/global_markets/ to collect equities, FX, and commodities data from at least 3 sources.",
+      "created_at": "2026-01-06T21:10:16.020964Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "engine_dev",
+      "title": "News/Finance Intelligence Engine",
+      "instructions": "Develop /engines/news_intel/ to parse and analyze newswire and regulatory filings for actionable signals.",
+      "created_at": "2026-01-06T21:10:16.020967Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "engine_dev",
+      "title": "Arbitrage Opportunity Scanner",
+      "instructions": "Build /engines/arbitrage_scan/ to compare cross-market prices and flag arbitrage opportunities.",
+      "created_at": "2026-01-06T21:10:16.020969Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "product_dev",
+      "title": "Curated Data Resale Product",
+      "instructions": "Package and document data exports in /products/data_exports/ for resale to clients.",
+      "created_at": "2026-01-06T21:10:16.020971Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "product_dev",
+      "title": "Signal Subscription Service",
+      "instructions": "Create /products/signal_subscriptions/ with API endpoints and dashboard for clients to access signals.",
+      "created_at": "2026-01-06T21:10:16.020973Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "product_dev",
+      "title": "Automated Arbitrage Execution",
+      "instructions": "Prototype /products/arbitrage_exec/ for automated trade execution, including compliance and risk checks.",
+      "created_at": "2026-01-06T21:10:16.020975Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "documentation",
+      "title": "ROI Plan Documentation",
+      "instructions": "Draft agent_results/ROI_PLAN.md detailing revenue engines, repo structure, and market focus.",
+      "created_at": "2026-01-06T21:10:16.020977Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "logging",
+      "title": "Autorun Log Setup",
+      "instructions": "Configure ops/logs/AUTORUN_LOG.md to capture all actions, changes, and findings.",
+      "created_at": "2026-01-06T21:10:16.020985Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
