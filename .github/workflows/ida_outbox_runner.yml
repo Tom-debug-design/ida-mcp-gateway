@@ -1,107 +1,53 @@
 name: IDA Outbox Runner
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - "agent_outbox/**"
-      - "tools/**"
-      - ".github/workflows/ida_outbox_runner.yml"
-  workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/10 * * * *"   # hvert 10. minutt
+  workflow_dispatch: {}
 
 permissions:
   contents: write
 
-concurrency:
-  group: ida-outbox-main
-  cancel-in-progress: false
-
 jobs:
-  run:
+  run_outbox:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install deps (requirements.txt)
+      - name: Install deps
         run: |
-          set -e
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install requests
 
-      - name: Verify imports (hard fail if missing)
-        run: |
-          set -e
-          python -c "import requests"
-          python -c "from bs4 import BeautifulSoup"
-          python -c "import lxml"
-
-      - name: Debug list outbox
-        run: |
-          set -e
-          mkdir -p agent_outbox agent_results ops/logs ops/flags
-          echo "== agent_outbox contents =="
-          ls -la agent_outbox || true
-          echo "== JSON jobs =="
-          ls -la agent_outbox/*.json 2>/dev/null || true
-
-      - name: Run outbox runner
+      - name: Run outbox worker (REAL work)
         env:
-          PYTHONUNBUFFERED: "1"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          IDA_OUTBOX_DIR: agent_outbox
+          IDA_RESULTS_DIR: agent_results
+          IDA_DONE_DIR: agent_outbox_done
+          IDA_OPS_LOG: ops/logs/outbox_worker.log
         run: |
-          set -e
-          python tools/outbox_runner.py
+          python worker/outbox_worker.py
 
-      - name: Commit results back (safe)
-        env:
-          GIT_AUTHOR_NAME: ida-outbox-bot
-          GIT_AUTHOR_EMAIL: ida-outbox-bot@users.noreply.github.com
-          GIT_COMMITTER_NAME: ida-outbox-bot
-          GIT_COMMITTER_EMAIL: ida-outbox-bot@users.noreply.github.com
+      - name: Commit results (if any)
         run: |
-          set -e
-          git config user.name "ida-outbox-bot"
-          git config user.email "ida-outbox-bot@users.noreply.github.com"
-
-          if git diff --quiet && git diff --cached --quiet; then
-            echo "No changes to commit."
-            exit 0
-          fi
-
-          for i in 1 2 3 4 5; do
-            echo "Attempt $i: syncing with origin/main"
-            git fetch origin main
-            git pull --rebase origin main || true
-
+          git status --porcelain
+          if [ -n "$(git status --porcelain)" ]; then
+            git config user.name "ida-outbox-bot"
+            git config user.email "ida-outbox-bot@users.noreply.github.com"
             git add -A
-
-            if git diff --cached --quiet; then
-              echo "No staged changes after rebase."
-              exit 0
-            fi
-
-            git commit -m "IDA: outbox tick" || true
-
-            echo "Attempt $i: pushing..."
-            if git push origin HEAD:main; then
-              echo "Push succeeded."
-              exit 0
-            fi
-
-            echo "Push failed, backing off..."
-            sleep $((i * 2))
-          done
-
-          echo "ERROR: push failed after retries"
-          exit 1
+            git commit -m "IDA: outbox worker results"
+            git push
+          else
+            echo "No changes to commit."
+          fi
