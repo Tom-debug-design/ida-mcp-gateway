@@ -1,0 +1,61 @@
+{
+  "job_id": "4c55d9f7b0",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260106-233903.json",
+  "ran_at_utc": "2026-01-06T23:44:53.806872Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "file_create",
+      "title": "Draft ROI_PLAN.md",
+      "instructions": "Outline 3 parallel revenue engines for global finance/news intelligence, ordered by lowest effort.",
+      "created_at": "2026-01-06T23:44:53.807061Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_create",
+      "title": "Create AUTORUN_LOG.md",
+      "instructions": "Set up a log file to record all automated scans and intelligence pulls.",
+      "created_at": "2026-01-06T23:44:53.807064Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "code_implement",
+      "title": "Build arbitrage_scanner.py",
+      "instructions": "Implement a script to scan for global market price discrepancies (crypto, FX, equities).",
+      "created_at": "2026-01-06T23:44:53.807066Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "code_implement",
+      "title": "Develop news_intel_collector.py",
+      "instructions": "Aggregate financial news from APIs (Reuters, Bloomberg, etc.) for intelligence purposes.",
+      "created_at": "2026-01-06T23:44:53.807068Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "code_implement",
+      "title": "Create alert_dispatcher.py",
+      "instructions": "Push actionable arbitrage/news signals to users via preferred channels.",
+      "created_at": "2026-01-06T23:44:53.807070Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_create",
+      "title": "Write markets.yaml",
+      "instructions": "Define target markets, news sources, and arbitrage pairs for the engines.",
+      "created_at": "2026-01-06T23:44:53.807071Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_create",
+      "title": "Document ENGINE_OVERVIEW.md",
+      "instructions": "Describe the workflow and interaction of all intelligence engines.",
+      "created_at": "2026-01-06T23:44:53.807073Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
