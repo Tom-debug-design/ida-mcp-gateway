@@ -1,0 +1,47 @@
+{
+  "job_id": "a7f4cc927a",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260106-220007.json",
+  "ran_at_utc": "2026-01-06T22:10:18.028112Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_source_scan",
+      "title": "Map Global News and Finance APIs",
+      "instructions": "List and evaluate APIs for global news and finance data, focusing on arbitrage and intelligence use.",
+      "created_at": "2026-01-06T22:10:18.028304Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "arbitrage_engine_design",
+      "title": "Draft Arbitrage Signal Engine Spec",
+      "instructions": "Define requirements, input/output, and architecture for cross-market arbitrage signal generation.",
+      "created_at": "2026-01-06T22:10:18.028308Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "mvp_build",
+      "title": "Implement News Alert MVP",
+      "instructions": "Build and test a minimal news alerting engine using at least one global news source.",
+      "created_at": "2026-01-06T22:10:18.028310Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "revenue_model",
+      "title": "Detail Revenue Tracking and Analytics",
+      "instructions": "Specify how to log, track, and report revenue for each engine in the repo.",
+      "created_at": "2026-01-06T22:10:18.028311Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "compliance_check",
+      "title": "Review Data Source Compliance",
+      "instructions": "Check licensing, TOS, and compliance for each planned data source/API.",
+      "created_at": "2026-01-06T22:10:18.028313Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
