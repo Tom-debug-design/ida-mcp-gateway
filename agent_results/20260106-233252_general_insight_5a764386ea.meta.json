@@ -1,0 +1,54 @@
+{
+  "job_id": "5a764386ea",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260106-231939.json",
+  "ran_at_utc": "2026-01-06T23:33:04.195067Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_collection",
+      "title": "Global Market Price Feeds Setup",
+      "instructions": "Identify and configure APIs for real-time price data across major exchanges; update /data/feeds_config.yaml.",
+      "created_at": "2026-01-06T23:33:04.195277Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "integration",
+      "title": "Financial News API Integration",
+      "instructions": "Integrate at least 3 reputable finance/news APIs; log endpoints and credentials in /data/feeds_config.yaml.",
+      "created_at": "2026-01-06T23:33:04.195281Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "engineering",
+      "title": "Arbitrage Scanner Script",
+      "instructions": "Develop /engines/arbitrage_scanner/scan.py to detect price discrepancies and log results.",
+      "created_at": "2026-01-06T23:33:04.195283Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "engineering",
+      "title": "News Intelligence Engine",
+      "instructions": "Build /engines/news_intel/aggregate.py to fetch, parse, and store news headlines and metadata.",
+      "created_at": "2026-01-06T23:33:04.195284Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "automation",
+      "title": "Signal Alerts Engine",
+      "instructions": "Create /engines/signal_alerts/alerts.py to generate and dispatch actionable trading signals.",
+      "created_at": "2026-01-06T23:33:04.195286Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "documentation",
+      "title": "Revenue Engine Documentation",
+      "instructions": "Draft /docs/REVENUE_ENGINES.md with setup, usage, and monetization strategies for each engine.",
+      "created_at": "2026-01-06T23:33:04.195288Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
