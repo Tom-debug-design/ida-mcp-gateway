@@ -9,5 +9,9 @@
       "FETCH_URL"
     ]
   },
+<<<<<<< HEAD
   "timestamp": "2026-01-06T04:11:25Z"
+=======
+  "timestamp": "2026-01-06T04:11:52Z"
+>>>>>>> 347f194 (IDA: outbox tick)
 }
