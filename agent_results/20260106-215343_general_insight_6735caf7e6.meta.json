@@ -1,0 +1,54 @@
+{
+  "job_id": "6735caf7e6",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260106-214746.json",
+  "ran_at_utc": "2026-01-06T21:53:53.713187Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_collection",
+      "title": "Global Market Data Feed Setup",
+      "instructions": "Integrate and test ingestion of equities, FX, and commodity feeds in /market_feeds/.",
+      "created_at": "2026-01-06T21:53:53.713385Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "pipeline",
+      "title": "News/Finance Aggregation Pipeline",
+      "instructions": "Develop and document /pipelines/news_finance_pipeline.py for multi-source aggregation.",
+      "created_at": "2026-01-06T21:53:53.713389Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "engine",
+      "title": "Arbitrage Opportunity Scanner",
+      "instructions": "Implement /arbitrage/engine.py to detect and log cross-market arbitrage opportunities.",
+      "created_at": "2026-01-06T21:53:53.713391Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "service",
+      "title": "Signal Alert Delivery",
+      "instructions": "Build /signals/alert_service.py for real-time actionable alerts to users.",
+      "created_at": "2026-01-06T21:53:53.713393Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "api",
+      "title": "External API Access",
+      "instructions": "Document and expose API endpoints in /api/README.md for third-party data consumers.",
+      "created_at": "2026-01-06T21:53:53.713394Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "testing",
+      "title": "Arbitrage Engine Coverage",
+      "instructions": "Write /tests/coverage_arbitrage.py to ensure accuracy and reliability of arbitrage detection.",
+      "created_at": "2026-01-06T21:53:53.713396Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
