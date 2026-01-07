@@ -1,0 +1,47 @@
+{
+  "job_id": "5dfab364a0",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-134422.json",
+  "ran_at_utc": "2026-01-07T13:49:08.089844Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "fetch",
+      "title": "Source List: Global News & Finance Feeds",
+      "instructions": "Compile concrete URLs and APIs for news and finance data sources covering global markets and arbitrage.",
+      "created_at": "2026-01-07T13:49:08.090051Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "design",
+      "title": "Pipeline Spec: News Arbitrage Engine",
+      "instructions": "Define file structure, input/output formats, and minimal viable pipeline for news-based arbitrage signal extraction.",
+      "created_at": "2026-01-07T13:49:08.090054Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "build",
+      "title": "Scaffold: AUTORUN_LOG.md & ROI_PLAN.md",
+      "instructions": "Create initial markdown files in agent_results/ and ops/logs/ with headers and example entries.",
+      "created_at": "2026-01-07T13:49:08.090056Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "fetch",
+      "title": "Market Data API Inventory",
+      "instructions": "List free/low-cost APIs for global exchange rates, commodities, and cross-market data.",
+      "created_at": "2026-01-07T13:49:08.090058Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "design",
+      "title": "Revenue Engine Logic",
+      "instructions": "Draft logic for monetizing each engine, including API endpoints, data licensing, and alerting services.",
+      "created_at": "2026-01-07T13:49:08.090060Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
