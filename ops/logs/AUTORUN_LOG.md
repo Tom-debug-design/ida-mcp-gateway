@@ -1,3 +1,17 @@
+# AUTORUN LOG — IDA
+
+## Format
+- Timestamp (UTC)
+- Job type
+- Result
+- Neste steg
+
+---
+
+## 2026-01-07
+- Job: ROI_SCAN
+- Result: Fullført
+- Neste steg: API Resale bootstrap
 [2026-01-04 16:08:26 UTC] A1 generated job
 [2026-01-04 16:37:12 UTC] A1 generated job
 [2026-01-04 16:54:30 UTC] A1 generated job
