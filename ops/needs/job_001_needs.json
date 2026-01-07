@@ -1,0 +1,10 @@
+{
+  "job_id": "job_001",
+  "status": "NEEDS_INPUT",
+  "reason": "Runner exception",
+  "details": {
+    "error": "Expecting value: line 2 column 1 (char 1)",
+    "file": "job_001.json"
+  },
+  "timestamp": "2026-01-07T22:24:50Z"
+}
