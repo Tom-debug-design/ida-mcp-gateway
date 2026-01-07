@@ -1,0 +1,54 @@
+{
+  "job_id": "6e1e629a19",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-194733.json",
+  "ran_at_utc": "2026-01-07T19:52:24.093683Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_gather",
+      "title": "Curate Global News and Finance Feeds",
+      "instructions": "Collect and document high-quality, non-social media news and finance data sources in /data/news_sources/.",
+      "created_at": "2026-01-07T19:52:24.093879Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_action",
+      "title": "Bootstrap API Resale Engine",
+      "instructions": "Create /engines/api_resale/ with scripts to wrap and resell finance/news APIs.",
+      "created_at": "2026-01-07T19:52:24.093882Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_action",
+      "title": "Implement Market Signal Aggregator",
+      "instructions": "Develop /engines/signal_aggregator/ to ingest and normalize global market signals.",
+      "created_at": "2026-01-07T19:52:24.093884Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_action",
+      "title": "Develop Arbitrage Opportunity Engine",
+      "instructions": "Build /engines/arbitrage/ for cross-market price discrepancy detection.",
+      "created_at": "2026-01-07T19:52:24.093886Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_action",
+      "title": "Document Data Sources and Licensing",
+      "instructions": "Update /docs/DATA_SOURCES.md with all external sources and licensing terms.",
+      "created_at": "2026-01-07T19:52:24.093887Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_action",
+      "title": "Set Up Engine Output Tests",
+      "instructions": "Add /tests/ for validating outputs and ROI metrics of each engine.",
+      "created_at": "2026-01-07T19:52:24.093889Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
