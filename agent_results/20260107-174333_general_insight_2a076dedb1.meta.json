@@ -1,0 +1,61 @@
+{
+  "job_id": "2a076dedb1",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-173928.json",
+  "ran_at_utc": "2026-01-07T17:43:47.598196Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "file_write",
+      "title": "Draft ROI_PLAN.md",
+      "instructions": "Write agent_results/ROI_PLAN.md detailing the three revenue engines, their workflows, and expected ROI.",
+      "created_at": "2026-01-07T17:43:47.598392Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_write",
+      "title": "Initialize AUTORUN_LOG.md",
+      "instructions": "Create ops/logs/AUTORUN_LOG.md with template for logging automated runs and outcomes.",
+      "created_at": "2026-01-07T17:43:47.598395Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "code_gen",
+      "title": "Implement arbitrage_news_scraper.py",
+      "instructions": "Develop /engines/arbitrage_news_scraper.py to scrape global news and extract arbitrage signals.",
+      "created_at": "2026-01-07T17:43:47.598397Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "code_gen",
+      "title": "Develop market_signal_alerts.py",
+      "instructions": "Build /engines/market_signal_alerts.py to detect and alert on cross-market price discrepancies.",
+      "created_at": "2026-01-07T17:43:47.598399Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "code_gen",
+      "title": "Create data_resale_api.py",
+      "instructions": "Develop /engines/data_resale_api.py to package and expose processed finance/news data for resale.",
+      "created_at": "2026-01-07T17:43:47.598401Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_write",
+      "title": "Add global_markets.yaml",
+      "instructions": "Create /configs/global_markets.yaml listing all target exchanges, news sources, and arbitrage pairs.",
+      "created_at": "2026-01-07T17:43:47.598402Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "test_gen",
+      "title": "Test arbitrage_news_scraper pipeline",
+      "instructions": "Write /tests/arbitrage_news_scraper_test.py to validate news-to-signal extraction.",
+      "created_at": "2026-01-07T17:43:47.598404Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
