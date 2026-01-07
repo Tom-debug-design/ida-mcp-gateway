@@ -1,0 +1,54 @@
+{
+  "job_id": "e25d3b068b",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-075153.json",
+  "ran_at_utc": "2026-01-07T07:56:49.411485Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_collection",
+      "title": "Catalog Global News/Finance APIs",
+      "instructions": "List and verify accessible APIs for global financial/news data. Output to config/news_sources.yaml.",
+      "created_at": "2026-01-07T07:56:49.411710Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dev_task",
+      "title": "Implement News Arbitrage Engine",
+      "instructions": "Create src/engines/arbitrage_news.py to parse news feeds and flag arbitrage opportunities.",
+      "created_at": "2026-01-07T07:56:49.411714Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dev_task",
+      "title": "Implement FX Arbitrage Engine",
+      "instructions": "Build src/engines/arbitrage_fx.py to detect FX rate discrepancies across markets.",
+      "created_at": "2026-01-07T07:56:49.411716Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dev_task",
+      "title": "Implement Social Sentiment Engine",
+      "instructions": "Develop src/engines/arbitrage_social.py for secondary sentiment-based signals.",
+      "created_at": "2026-01-07T07:56:49.411718Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "ops_task",
+      "title": "Automate Engine Logging",
+      "instructions": "Configure all engines to log outputs to data/arbitrage_signals/YYYYMMDD.csv and errors to ops/logs/AUTORUN_LOG.md.",
+      "created_at": "2026-01-07T07:56:49.411720Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "doc_task",
+      "title": "Draft ROI Plan",
+      "instructions": "Summarize revenue engine logic and prioritization in agent_results/ROI_PLAN.md.",
+      "created_at": "2026-01-07T07:56:49.411721Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
