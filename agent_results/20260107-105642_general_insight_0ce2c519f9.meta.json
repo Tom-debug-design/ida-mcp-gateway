@@ -1,0 +1,54 @@
+{
+  "job_id": "0ce2c519f9",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-105400.json",
+  "ran_at_utc": "2026-01-07T10:56:55.571332Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_collection",
+      "title": "Global Market Price Scraper Setup",
+      "instructions": "Implement scripts to collect real-time prices from major global exchanges and commodities markets.",
+      "created_at": "2026-01-07T10:56:55.571521Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "pipeline",
+      "title": "Finance/News Feed Ingestion Engine",
+      "instructions": "Build a pipeline to ingest, parse, and store news and finance data from APIs, RSS, and web scraping.",
+      "created_at": "2026-01-07T10:56:55.571525Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "analysis",
+      "title": "Arbitrage Opportunity Detector",
+      "instructions": "Develop logic to identify and log arbitrage opportunities across collected market data.",
+      "created_at": "2026-01-07T10:56:55.571527Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "signal_extraction",
+      "title": "Actionable News Signal Extractor",
+      "instructions": "Create scripts to extract actionable finance signals from ingested news feeds.",
+      "created_at": "2026-01-07T10:56:55.571529Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "documentation",
+      "title": "Data Source Registry",
+      "instructions": "Document all data sources, endpoints, and access methods in /docs/data_sources.md.",
+      "created_at": "2026-01-07T10:56:55.571530Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "automation",
+      "title": "Autorun Logging Integration",
+      "instructions": "Ensure all engines/scripts log their actions and results to ops/logs/AUTORUN_LOG.md.",
+      "created_at": "2026-01-07T10:56:55.571532Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
