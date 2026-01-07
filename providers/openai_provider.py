@@ -63,3 +63,25 @@ class OpenAIProvider:
             return json.loads(out)
         except Exception as e:
             raise RuntimeError(f"LLM returnerte ikke JSON. Raw:\n{out}\nError: {e}")
+            # --- Compatibility wrapper for worker imports -------------------------------
+# Some workers import: from providers.openai_provider import ask_openai
+# Provide a simple function wrapper around OpenAIProvider.
+
+_provider_singleton: OpenAIProvider | None = None
+
+
+def _get_provider() -> OpenAIProvider:
+    global _provider_singleton
+    if _provider_singleton is None:
+        _provider_singleton = OpenAIProvider()
+    return _provider_singleton
+
+
+def ask_openai(prompt: str, system: str | None = None) -> str:
+    """
+    Backwards-compatible helper used by workers.
+    Returns plain text.
+    """
+    prov = _get_provider()
+    return prov.generate(prompt=prompt, system=system).text
+
