@@ -1,0 +1,37 @@
+# IDA Hypothesis Report (A3) — 2026-01-07 06:15 UTC
+
+## Signals (counts)
+- agent_results: 70
+- agent_outbox: 0
+- ops_logs: 4
+
+## Hypotheses
+- Runner produserer resultater, men outbox er tom: job-generator kan være treg eller stoppet.
+- Neste verdi-løft kommer fra web-innsikt: markeder + verktøy + gratis API-er.
+
+## Next safe actions (no execution)
+- Sjekk at A1-generatoren fortsatt kjører på schedule.
+- Når A4 aktiveres: whitelist flere relevante domener + start med 1-2 kilder pr kategori.
+
+## Risks / watch-outs
+- IDA blir 'reaktiv' i stedet for kontinuerlig.
+- For mye web for tidlig = støy; hold det til få kilder i starten.
+
+## Recent files (for debugging)
+### latest_results
+- agent_results/job-autogen-20260105-005005.result.json
+- agent_results/job-autogen-20260105-005005.result.json
+- agent_results/job-autogen-20260105-030649.result.json
+- agent_results/job-autogen-20260105-030649.result.json
+- agent_results/job-autogen-20260105-043358.result.json
+- agent_results/job-autogen-20260105-043358.result.json
+- agent_results/job-autogen-20260105-052143.result.json
+- agent_results/job-autogen-20260105-052143.result.json
+- agent_results/job-autogen-20260105-055536.result.json
+- agent_results/job-autogen-20260105-055536.result.json
+### latest_outbox
+### latest_logs
+- ops/logs/outbox_worker.log
+- ops/logs/outbox_worker.log
+- ops/logs/runner.log
+- ops/logs/runner.log
