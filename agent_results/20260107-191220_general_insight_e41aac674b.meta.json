@@ -1,0 +1,61 @@
+{
+  "job_id": "e41aac674b",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-191100.json",
+  "ran_at_utc": "2026-01-07T19:12:34.841529Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "file_create",
+      "title": "Draft ROI_PLAN.md",
+      "instructions": "Write agent_results/ROI_PLAN.md detailing the three revenue engines, their repo paths, and expected effort/ROI.",
+      "created_at": "2026-01-07T19:12:34.841720Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_create",
+      "title": "Setup AUTORUN_LOG.md",
+      "instructions": "Create ops/logs/AUTORUN_LOG.md to log all automated engine runs and results.",
+      "created_at": "2026-01-07T19:12:34.841723Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_scaffold",
+      "title": "Scaffold arbitrage engine",
+      "instructions": "Create /engines/arbitrage/ with initial code to fetch and compare global market prices.",
+      "created_at": "2026-01-07T19:12:34.841725Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_scaffold",
+      "title": "Scaffold news intelligence engine",
+      "instructions": "Create /engines/news_intel/ for ingesting and parsing financial news sources.",
+      "created_at": "2026-01-07T19:12:34.841727Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_scaffold",
+      "title": "Scaffold signal subscription engine",
+      "instructions": "Create /engines/signal_subs/ for generating and distributing trading signals.",
+      "created_at": "2026-01-07T19:12:34.841729Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_create",
+      "title": "Document revenue engines",
+      "instructions": "Write /docs/REVENUE_ENGINES.md describing logic, data flows, and integration points for each engine.",
+      "created_at": "2026-01-07T19:12:34.841730Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_create",
+      "title": "Add markets config",
+      "instructions": "Create /configs/markets.yaml listing target global markets and data sources.",
+      "created_at": "2026-01-07T19:12:34.841732Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
