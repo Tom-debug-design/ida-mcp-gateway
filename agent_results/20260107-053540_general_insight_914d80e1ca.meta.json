@@ -1,0 +1,47 @@
+{
+  "job_id": "914d80e1ca",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-053142.json",
+  "ran_at_utc": "2026-01-07T05:35:48.594372Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_gather",
+      "title": "Global News & Finance Feed Setup",
+      "instructions": "Identify and script ingestion from at least 5 reputable global finance/news APIs (not social media); log sources and endpoints.",
+      "created_at": "2026-01-07T05:35:48.594663Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dev_task",
+      "title": "Arbitrage Scanner Prototype",
+      "instructions": "Implement engines/arbitrage_scanner.py to detect simple FX/crypto arbitrage; log test results and sample signals.",
+      "created_at": "2026-01-07T05:35:48.594666Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dev_task",
+      "title": "Subscription/Paywall Module",
+      "instructions": "Develop services/paywall.py to restrict premium analytics; document access logic and test cases.",
+      "created_at": "2026-01-07T05:35:48.594668Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dev_task",
+      "title": "Alert Delivery System",
+      "instructions": "Create services/alerts.py to send arbitrage signals via email/webhook; include logging and error handling.",
+      "created_at": "2026-01-07T05:35:48.594670Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "doc_task",
+      "title": "API/Data Source Documentation",
+      "instructions": "Draft docs/DATA_SOURCES.md listing all data feeds, licensing, and update frequencies.",
+      "created_at": "2026-01-07T05:35:48.594672Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
