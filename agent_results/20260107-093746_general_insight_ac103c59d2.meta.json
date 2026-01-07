@@ -1,0 +1,54 @@
+{
+  "job_id": "ac103c59d2",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-093706.json",
+  "ran_at_utc": "2026-01-07T09:37:58.831682Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "file_create",
+      "title": "Draft ROI_PLAN.md",
+      "instructions": "Create agent_results/ROI_PLAN.md detailing 3 revenue engines, target users, and required repo actions.",
+      "created_at": "2026-01-07T09:37:58.831899Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_create",
+      "title": "Setup AUTORUN_LOG.md",
+      "instructions": "Initialize ops/logs/AUTORUN_LOG.md to log automation runs and revenue experiments.",
+      "created_at": "2026-01-07T09:37:58.831903Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "code_add",
+      "title": "Implement Data Ingestion Scripts",
+      "instructions": "Add scripts in data/feeds/ for global news, finance, and regulatory data ingestion.",
+      "created_at": "2026-01-07T09:37:58.831905Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "code_add",
+      "title": "Build Arbitrage Signal Engine",
+      "instructions": "Develop engines/arbitrage/ modules to detect cross-market arbitrage opportunities.",
+      "created_at": "2026-01-07T09:37:58.831907Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_create",
+      "title": "Add Revenue Model to README",
+      "instructions": "Update README with sections on revenue streams and market focus.",
+      "created_at": "2026-01-07T09:37:58.831908Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_create",
+      "title": "Draft Services Offer",
+      "instructions": "Create docs/services.md describing custom analytics consulting as a revenue engine.",
+      "created_at": "2026-01-07T09:37:58.831910Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
