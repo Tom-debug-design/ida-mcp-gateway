@@ -1,0 +1,47 @@
+{
+  "job_id": "6f9afccc19",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-103317.json",
+  "ran_at_utc": "2026-01-07T10:43:34.273750Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_collection",
+      "title": "Global Market Data Feed Setup",
+      "instructions": "Identify and configure at least 3 free/low-cost APIs for equities, FX, and crypto in /datafeeds/market_data/.",
+      "created_at": "2026-01-07T10:43:34.274002Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "code_generation",
+      "title": "Arbitrage Engine MVP",
+      "instructions": "Implement a script in /engines/arbitrage/ that scans for price discrepancies across at least 2 asset classes.",
+      "created_at": "2026-01-07T10:43:34.274007Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "code_generation",
+      "title": "News Intelligence Aggregator",
+      "instructions": "Develop a module in /engines/news_intel/ to pull and parse financial news from at least 2 major providers.",
+      "created_at": "2026-01-07T10:43:34.274010Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "documentation",
+      "title": "Revenue Engine Plan",
+      "instructions": "Draft agent_results/ROI_PLAN.md detailing the three revenue streams, effort estimates, and required resources.",
+      "created_at": "2026-01-07T10:43:34.274012Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "ops_logging",
+      "title": "Autorun Log Initialization",
+      "instructions": "Create ops/logs/AUTORUN_LOG.md and define the logging format for all automated engine runs.",
+      "created_at": "2026-01-07T10:43:34.274014Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
