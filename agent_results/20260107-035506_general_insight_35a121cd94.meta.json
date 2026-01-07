@@ -1,0 +1,54 @@
+{
+  "job_id": "35a121cd94",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-031808.json",
+  "ran_at_utc": "2026-01-07T03:55:15.846207Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_gather",
+      "title": "Map Global Market Data Sources",
+      "instructions": "List and validate APIs/feeds for news and financial data (excluding social media).",
+      "created_at": "2026-01-07T03:55:15.846412Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "design",
+      "title": "Revenue Engine Architecture",
+      "instructions": "Draft /docs/REVENUE_ENGINES.md with flowcharts for each engine.",
+      "created_at": "2026-01-07T03:55:15.846416Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dev",
+      "title": "Scaffold Data Resale Engine",
+      "instructions": "Create /engines/data_resale/ with ETL scripts and output templates.",
+      "created_at": "2026-01-07T03:55:15.846418Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dev",
+      "title": "Build Signal Subscription Engine",
+      "instructions": "Develop /engines/signal_subscriptions/ for API/email delivery of finance/news signals.",
+      "created_at": "2026-01-07T03:55:15.846420Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dev",
+      "title": "Implement Affiliate Arbitrage Engine",
+      "instructions": "Set up /engines/affiliate_arbitrage/ to monitor and exploit cross-market discrepancies.",
+      "created_at": "2026-01-07T03:55:15.846422Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "ops",
+      "title": "Automate ROI Logging",
+      "instructions": "Configure /ops/logs/AUTORUN_LOG.md to auto-log daily engine performance.",
+      "created_at": "2026-01-07T03:55:15.846423Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
