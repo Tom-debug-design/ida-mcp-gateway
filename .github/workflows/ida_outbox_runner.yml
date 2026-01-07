@@ -2,7 +2,7 @@ name: IDA Outbox Runner
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # hvert 10. minutt
+    - cron: "*/10 * * * *" # hvert 10. minutt
   workflow_dispatch: {}
 
 permissions:
@@ -37,7 +37,7 @@ jobs:
           IDA_DONE_DIR: agent_outbox_done
           IDA_OPS_LOG: ops/logs/outbox_worker.log
         run: |
-          python worker/outbox_worker.py
+          python -m worker.task_router
 
       - name: Commit results (if any)
         run: |
