@@ -1,0 +1,54 @@
+{
+  "job_id": "8d54f8909d",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-170343.json",
+  "ran_at_utc": "2026-01-07T17:16:44.278167Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_gather",
+      "title": "Collect global news and finance data sources",
+      "instructions": "Aggregate a list of reputable, API-accessible news and finance data sources for global markets.",
+      "created_at": "2026-01-07T17:16:44.278385Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dev_task",
+      "title": "Implement news-driven arbitrage signal extractor",
+      "instructions": "Develop /engines/arbitrage/news_scraper.py to parse news and generate actionable arbitrage signals.",
+      "created_at": "2026-01-07T17:16:44.278388Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dev_task",
+      "title": "Build global market signal aggregator",
+      "instructions": "Create /engines/market_aggregator/global_signals.py to ingest and normalize multi-market data.",
+      "created_at": "2026-01-07T17:16:44.278390Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dev_task",
+      "title": "Set up finance data API resale proxy",
+      "instructions": "Develop /engines/data_resale/finance_api_proxy.py to package and resell curated finance data.",
+      "created_at": "2026-01-07T17:16:44.278392Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "doc_task",
+      "title": "Draft ROI_PLAN.md",
+      "instructions": "Summarize the three revenue engines, their effort levels, and expected ROI in agent_results/ROI_PLAN.md.",
+      "created_at": "2026-01-07T17:16:44.278394Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "ops_task",
+      "title": "Configure autorun and logging",
+      "instructions": "Set up /ops/schedules/autorun_cron.yaml and /ops/logs/AUTORUN_LOG.md for automated runs and traceability.",
+      "created_at": "2026-01-07T17:16:44.278396Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
