@@ -1,0 +1,47 @@
+{
+  "job_id": "9bed76c255",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-095542.json",
+  "ran_at_utc": "2026-01-07T10:12:27.345582Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "repo_scan",
+      "title": "Scan for global markets and arbitrage modules",
+      "instructions": "List all files/paths related to global markets, arbitrage, and financial data ingestion.",
+      "created_at": "2026-01-07T10:12:27.345810Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_scan",
+      "title": "Identify news/finance intelligence engine components",
+      "instructions": "Find all scripts, modules, or configs for news/finance data aggregation beyond social media.",
+      "created_at": "2026-01-07T10:12:27.345814Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_scan",
+      "title": "Locate revenue engine implementations",
+      "instructions": "Identify files/paths for affiliate, API, and analytics dashboard monetization.",
+      "created_at": "2026-01-07T10:12:27.345817Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_write",
+      "title": "Draft ROI_PLAN.md",
+      "instructions": "Summarize findings and concrete next steps for 3 revenue engines in agent_results/ROI_PLAN.md.",
+      "created_at": "2026-01-07T10:12:27.345819Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_write",
+      "title": "Log AUTORUN actions",
+      "instructions": "Record all scan actions and findings in ops/logs/AUTORUN_LOG.md.",
+      "created_at": "2026-01-07T10:12:27.345820Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
