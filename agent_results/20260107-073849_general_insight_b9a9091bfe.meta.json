@@ -1,0 +1,61 @@
+{
+  "job_id": "b9a9091bfe",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-073447.json",
+  "ran_at_utc": "2026-01-07T07:39:03.494348Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "file_creation",
+      "title": "Draft ROI_PLAN.md",
+      "instructions": "Create agent_results/ROI_PLAN.md detailing the three revenue engines, their effort levels, and revenue assumptions.",
+      "created_at": "2026-01-07T07:39:03.494545Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_creation",
+      "title": "Log AUTORUN actions",
+      "instructions": "Initialize ops/logs/AUTORUN_LOG.md and log all planned and executed repo actions.",
+      "created_at": "2026-01-07T07:39:03.494548Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_creation",
+      "title": "List global news sources",
+      "instructions": "Create sources/news_sources.md with a categorized list of global and regional finance/news feeds.",
+      "created_at": "2026-01-07T07:39:03.494550Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_creation",
+      "title": "Draft arbitrage scanner script",
+      "instructions": "Create scripts/arbitrage_scanner.py with a stub for scanning price differences across markets.",
+      "created_at": "2026-01-07T07:39:03.494552Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_creation",
+      "title": "Draft analytics API spec",
+      "instructions": "Create api/analytics_api_spec.md outlining endpoints for finance/news intelligence.",
+      "created_at": "2026-01-07T07:39:03.494554Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_creation",
+      "title": "Document news data pipeline",
+      "instructions": "Create pipelines/news_pipeline.md describing the data flow for news data reselling.",
+      "created_at": "2026-01-07T07:39:03.494555Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_creation",
+      "title": "Define target markets",
+      "instructions": "Create config/markets.yaml listing asset classes and markets for arbitrage opportunities.",
+      "created_at": "2026-01-07T07:39:03.494557Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
