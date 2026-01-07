@@ -1,0 +1,61 @@
+{
+  "job_id": "c961823126",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-070012.json",
+  "ran_at_utc": "2026-01-07T07:16:11.311330Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "file_write",
+      "title": "Draft ROI_PLAN.md",
+      "instructions": "Outline three parallel revenue engines (lowest effort first), with concrete repo file paths and logic.",
+      "created_at": "2026-01-07T07:16:11.311525Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_write",
+      "title": "Create AUTORUN_LOG.md",
+      "instructions": "Document automation runs, data sources, and intelligence engine triggers in ops/logs/AUTORUN_LOG.md.",
+      "created_at": "2026-01-07T07:16:11.311528Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_init",
+      "title": "Set up data ingestion scripts",
+      "instructions": "Implement /data/feeds/ scripts for global market, news, and arbitrage data sources.",
+      "created_at": "2026-01-07T07:16:11.311530Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_init",
+      "title": "Implement arbitrage engine",
+      "instructions": "Create /engines/arbitrage/ for cross-market price scanning and opportunity detection.",
+      "created_at": "2026-01-07T07:16:11.311532Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_init",
+      "title": "Build news intelligence engine",
+      "instructions": "Develop /engines/news_intel/ for actionable finance news parsing and ranking.",
+      "created_at": "2026-01-07T07:16:11.311534Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "repo_init",
+      "title": "Add alerting engine",
+      "instructions": "Set up /engines/alerts/ for real-time notifications on detected opportunities.",
+      "created_at": "2026-01-07T07:16:11.311535Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "file_write",
+      "title": "Document engine logic",
+      "instructions": "Summarize all engine logic and repo structure in /docs/ENGINE_OVERVIEW.md.",
+      "created_at": "2026-01-07T07:16:11.311537Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
