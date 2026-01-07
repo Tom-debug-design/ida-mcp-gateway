@@ -1,0 +1,54 @@
+{
+  "job_id": "11d1830d84",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-114151.json",
+  "ran_at_utc": "2026-01-07T11:46:33.226447Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_collection",
+      "title": "Map Global Finance/News Feeds",
+      "instructions": "Catalog and validate all non-social media finance/news data sources for ingestion.",
+      "created_at": "2026-01-07T11:46:33.226650Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "pipeline_dev",
+      "title": "Build News Intelligence Aggregator",
+      "instructions": "Implement ETL scripts in /pipelines/news_intel/ to ingest, normalize, and store global finance/news data.",
+      "created_at": "2026-01-07T11:46:33.226653Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "module_dev",
+      "title": "Develop Arbitrage Scanner",
+      "instructions": "Create /modules/arbitrage_scanner/ to detect and log cross-market price discrepancies.",
+      "created_at": "2026-01-07T11:46:33.226655Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "module_dev",
+      "title": "Implement Signal Resale Engine",
+      "instructions": "Build /modules/signal_resale/ for packaging and distributing actionable news signals.",
+      "created_at": "2026-01-07T11:46:33.226657Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "dashboard_dev",
+      "title": "Finance Insights Dashboard",
+      "instructions": "Develop /dashboards/finance_insights/ for premium analytics and subscription access.",
+      "created_at": "2026-01-07T11:46:33.226658Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "logging",
+      "title": "Integrate Automation Logging",
+      "instructions": "Ensure all modules write detailed action logs to ops/logs/AUTORUN_LOG.md.",
+      "created_at": "2026-01-07T11:46:33.226660Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
