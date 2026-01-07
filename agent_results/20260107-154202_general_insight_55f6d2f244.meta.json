@@ -1,0 +1,47 @@
+{
+  "job_id": "55f6d2f244",
+  "job_type": "general_insight",
+  "title": "IDA job",
+  "instructions": "ROI_SCAN",
+  "source_job_file": "agent_outbox/job-autogen-20260107-153545.json",
+  "ran_at_utc": "2026-01-07T15:42:20.838799Z",
+  "openai_model": "gpt-4.1",
+  "openai_ok": true,
+  "next_jobs": [
+    {
+      "type": "data_collection",
+      "title": "Map Global Market & News APIs",
+      "instructions": "Compile a list of accessible, high-frequency finance/news APIs with licensing notes in /data/feeds/market_sources.json.",
+      "created_at": "2026-01-07T15:42:20.838994Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "prototype",
+      "title": "Build News Arbitrage Alert Script",
+      "instructions": "Develop /engines/arbitrage_alerts/alert.py to parse news feeds and flag potential arbitrage events.",
+      "created_at": "2026-01-07T15:42:20.838998Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "documentation",
+      "title": "Draft Revenue Engine ROI Plan",
+      "instructions": "Write agent_results/ROI_PLAN.md with concrete steps, metrics, and effort estimates for each revenue engine.",
+      "created_at": "2026-01-07T15:42:20.839000Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "logging",
+      "title": "Automate Run Logging",
+      "instructions": "Implement ops/logs/AUTORUN_LOG.md auto-updates after each engine run, capturing errors and results.",
+      "created_at": "2026-01-07T15:42:20.839002Z",
+      "origin": "outbox_worker"
+    },
+    {
+      "type": "testing",
+      "title": "Test Arbitrage Detection Logic",
+      "instructions": "Create /tests/arbitrage_alerts/test_detection.py to validate anomaly detection on sample data.",
+      "created_at": "2026-01-07T15:42:20.839003Z",
+      "origin": "outbox_worker"
+    }
+  ]
+}
