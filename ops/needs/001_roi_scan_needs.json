@@ -3,11 +3,11 @@
   "status": "NEEDS_INPUT",
   "reason": "Unknown job type",
   "details": {
-    "type": "ROI_SCAN",
+    "type": null,
     "supported": [
       "WEB_SEARCH",
       "FETCH_URL"
     ]
   },
-  "timestamp": "2026-01-08T16:43:23Z"
+  "timestamp": "2026-01-08T17:08:32Z"
 }
