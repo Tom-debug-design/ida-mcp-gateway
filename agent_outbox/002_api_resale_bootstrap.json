@@ -1,0 +1,22 @@
+{
+  "id": "002-api-resale-bootstrap",
+  "type": "API_RESALE_BOOTSTRAP",
+  "title": "Bootstrap Engine 1: API Resale",
+  "created_utc": "2026-01-08T00:00:00Z",
+  "priority": 2,
+  "inputs": {
+    "deliverables": [
+      "Repository structure under /engines/api_resale/",
+      "README with setup steps",
+      "First working endpoint spec (OpenAPI/Swagger or simple docs)",
+      "One example dataset source list in agent_results/DATA_SOURCES.md"
+    ],
+    "constraints": [
+      "Hold det minimalt",
+      "Bygg kun det som trengs for første demo"
+    ]
+  },
+  "outputs": {
+    "results_dir": "agent_results"
+  }
+}
