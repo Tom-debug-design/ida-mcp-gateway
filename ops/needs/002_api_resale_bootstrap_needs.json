@@ -1,0 +1,13 @@
+{
+  "job_id": "002_api_resale_bootstrap",
+  "status": "NEEDS_INPUT",
+  "reason": "Unknown job type",
+  "details": {
+    "type": "API_RESALE_BOOTSTRAP",
+    "supported": [
+      "WEB_SEARCH",
+      "FETCH_URL"
+    ]
+  },
+  "timestamp": "2026-01-08T16:44:35Z"
+}
