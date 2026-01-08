@@ -1,13 +1,8 @@
 {
-  "job_id": "001_roi_scan",
-  "status": "NEEDS_INPUT",
-  "reason": "Unknown job type",
-  "details": {
-    "type": null,
-    "supported": [
-      "WEB_SEARCH",
-      "FETCH_URL"
-    ]
-  },
-  "timestamp": "2026-01-08T17:08:32Z"
+  "market": "Global",
+  "budget": "0",
+  "preferred_model": "API resale",
+  "time_to_first_income": "Under 30 dager",
+  "legal_scope": "EU",
+  "risk_tolerance": "Lav"
 }
