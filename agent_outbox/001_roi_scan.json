@@ -1,0 +1,7 @@
+{
+  "job_type": "ROI_SCAN",
+  "goal": "Lag ROI-plan for API-resale bootstrap som kan gi inntekt raskt",
+  "timeframe": "48 timer",
+  "constraints": "Maks 2 timer manuelt arbeid per dag",
+  "context": "Vi bygger IDA. Målet er en autonom pipeline som lager planer + neste steg."
+}
