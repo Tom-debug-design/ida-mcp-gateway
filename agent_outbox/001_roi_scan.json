@@ -1,0 +1,18 @@
+{
+  "id": "001-roi-scan",
+  "type": "ROI_SCAN",
+  "title": "ROI Scan v1 (baseline)",
+  "created_utc": "2026-01-08T00:00:00Z",
+  "priority": 1,
+  "inputs": {
+    "goal": "Finn raskeste vei til inntekt og skriv en konkret plan i agent_results/ROI_PLAN.md",
+    "constraints": [
+      "Ingen nye sidespor",
+      "Maks 1 side output per del",
+      "All output skal være copy/paste-klart"
+    ]
+  },
+  "outputs": {
+    "results_dir": "agent_results"
+  }
+}
