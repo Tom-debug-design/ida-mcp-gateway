@@ -1,5 +1,5 @@
 {
-  "job_id": "001_roi_scan",
+  "job_id": "job-autogen-20260108-190218",
   "status": "NEEDS_INPUT",
   "reason": "Unknown job type",
   "details": {
@@ -9,5 +9,5 @@
       "FETCH_URL"
     ]
   },
-  "timestamp": "2026-01-08T19:04:04Z"
+  "timestamp": "2026-01-08T19:04:05Z"
 }
