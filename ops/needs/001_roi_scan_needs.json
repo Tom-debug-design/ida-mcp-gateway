@@ -4,5 +4,7 @@
   "preferred_model": "API resale",
   "time_to_first_income": "Under 30 dager",
   "legal_scope": "EU",
-  "risk_tolerance": "Lav"
+  "risk_tolerance": "Lav",
+  "deliverable": "ROI plan (konkret steg-for-steg + første 3 kundekanaler + tilbud/pakker + pris + outreach-mal)",
+  "target_customer": "Små SaaS/solopreneurs som vil ha AI-funksjon i produktet uten å bygge selv"
 }
