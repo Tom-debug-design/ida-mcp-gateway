@@ -1,32 +1,26 @@
-import os
-from pathlib import Path
-from providers.openai_provider import ask_openai
+from datetime import datetime
 
-RESULTS = Path("agent_results")
-RESULTS.mkdir(exist_ok=True)
-
-def run_roi_scan(job: dict):
-    prompt = f"""
-You are IDA.
-
-Task: ROI Scan
-
-Focus:
-{chr(10).join(job.get("focus", []))}
-
-Rules:
-{chr(10).join(job.get("rules", []))}
-
-Deliverables:
-- Concrete actions
-- Repo-ready output
-- No theory
-
-Return a practical ROI plan.
-"""
-
-    response = ask_openai(prompt)
-
-    out = RESULTS / "ROI_PLAN.md"
-    with open(out, "w", encoding="utf-8") as f:
-        f.write(response)
+def handle_roi_scan(job: dict, needs: dict):
+    return {
+        "job_id": job.get("job_id", "unknown"),
+        "status": "SUCCESS",
+        "generated_at": datetime.utcnow().isoformat() + "Z",
+        "roi_plan": {
+            "focus": "API resale / AI-funksjoner for små SaaS",
+            "ideas": [
+                "White-label AI API for små SaaS (chat, analyse, support)",
+                "API-pakker per måned (starter / pro / agency)",
+                "Cold outreach mot SaaS founders på LinkedIn + e-post"
+            ],
+            "pricing_example": {
+                "starter": "€49 / mnd",
+                "pro": "€149 / mnd",
+                "agency": "€399 / mnd"
+            },
+            "next_steps": [
+                "Velg 1 konkret API-usecase",
+                "Sett opp enkel landingsside",
+                "Start manuell outreach (20–30 kontakter)"
+            ]
+        }
+    }
