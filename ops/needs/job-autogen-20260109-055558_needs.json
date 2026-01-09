@@ -1,4 +1,5 @@
 {
+<<<<<<< HEAD
   "job_file": "job-autogen-20260109-055558.json",
   "job_type": "UNKNOWN",
   "missing": [
@@ -6,4 +7,17 @@
   ],
   "hint": "Ingen executor for job_type=UNKNOWN. Legg til handler i worker/task_router.py",
   "timestamp_utc": "2026-01-09 05:56:38 UTC"
+=======
+  "job_id": "job-autogen-20260109-055558",
+  "status": "NEEDS_INPUT",
+  "reason": "Unknown job type",
+  "details": {
+    "type": null,
+    "supported": [
+      "WEB_SEARCH",
+      "FETCH_URL"
+    ]
+  },
+  "timestamp": "2026-01-09T05:56:49Z"
+>>>>>>> 0d61d35 (IDA: outbox tick)
 }
