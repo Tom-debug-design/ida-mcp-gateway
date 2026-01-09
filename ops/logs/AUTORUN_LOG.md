@@ -308,4 +308,8 @@
 [2026-01-09 16:46:35 UTC] UNKNOWN -> FAILED (no executor) (job-autogen-20260109-163236.json)
 [2026-01-09 16:58:32 UTC] A1 generated job
 [2026-01-09 17:02:12 UTC] UNKNOWN -> FAILED (no executor) (job-autogen-20260109-165831.json)
+<<<<<<< Updated upstream
 [2026-01-09 17:32:52 UTC] A1 generated job
+=======
+[2026-01-09 17:33:06 UTC] ROI_SCAN tick: no jobs
+>>>>>>> Stashed changes
