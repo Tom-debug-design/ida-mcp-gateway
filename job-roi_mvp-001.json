@@ -1,0 +1,37 @@
+{
+  "job_id": "roi_mvp_001",
+  "job_type": "ROI_SCAN",
+  "goal": "Produce ONE concrete Micro-SaaS MVP that can be sold fast (C + D). No fluff.",
+  "deliverables": [
+    "agent_results/ROI_MVP.md",
+    "ops/logs/AUTORUN_LOG.md"
+  ],
+  "constraints": {
+    "max_ideas": 1,
+    "no_architecture_changes": true,
+    "no_new_workflows": true,
+    "no_vague_language": true,
+    "must_include_kill_criteria": true,
+    "must_include_first_sales_step": true,
+    "must_include_pricing": true
+  },
+  "output_format": {
+    "file": "agent_results/ROI_MVP.md",
+    "sections": [
+      "1. Problem",
+      "2. Micro-SaaS idea",
+      "3. MVP scope (slim)",
+      "4. First sales step (tomorrow action)",
+      "5. Kill criteria"
+    ]
+  },
+  "market_focus": {
+    "primary": "B2B or prosumer",
+    "preference": "fast validation + low build complexity",
+    "avoid": [
+      "social media automation",
+      "generic affiliate blogs",
+      "ideas without a paying user"
+    ]
+  }
+}
