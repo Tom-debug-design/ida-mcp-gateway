@@ -1,0 +1,13 @@
+{
+  "job_id": "job-autogen-20260109-053842",
+  "status": "NEEDS_INPUT",
+  "reason": "Unknown job type",
+  "details": {
+    "type": null,
+    "supported": [
+      "WEB_SEARCH",
+      "FETCH_URL"
+    ]
+  },
+  "timestamp": "2026-01-09T05:44:15Z"
+}
