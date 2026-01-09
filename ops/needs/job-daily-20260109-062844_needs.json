@@ -1,0 +1,13 @@
+{
+  "job_id": "job-daily-20260109-062844",
+  "status": "NEEDS_INPUT",
+  "reason": "Unknown job type",
+  "details": {
+    "type": "write_result",
+    "supported": [
+      "WEB_SEARCH",
+      "FETCH_URL"
+    ]
+  },
+  "timestamp": "2026-01-09T06:34:57Z"
+}
