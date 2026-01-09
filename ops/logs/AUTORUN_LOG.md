@@ -313,3 +313,4 @@
 =======
 [2026-01-09 17:33:06 UTC] ROI_SCAN tick: no jobs
 >>>>>>> Stashed changes
+[2026-01-09 17:50:06 UTC] UNKNOWN -> FAILED (no executor) (job-autogen-20260109-173251.json)
