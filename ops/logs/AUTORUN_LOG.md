@@ -479,3 +479,4 @@
 [2026-01-10 19:36:26 UTC] ROI_SCAN tick: no jobs
 [2026-01-10 19:42:22 UTC] ROI_SCAN tick: no jobs
 [2026-01-10 19:43:13 UTC] A1 generated job
+[2026-01-10 19:51:25 UTC] UNKNOWN -> FAILED (no executor) (job-autogen-20260110-194312.json)
