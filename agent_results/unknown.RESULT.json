@@ -1,0 +1,29 @@
+{
+  "job_id": "unknown",
+  "job_type": "ROI_SCAN",
+  "status": "SUCCESS",
+  "generated_at": "2026-01-10T20:31:44Z",
+  "inputs": {
+    "goal": "",
+    "timeframe": ""
+  },
+  "needs": {
+    "market": "Global",
+    "budget": "0",
+    "preferred_model": "API resale",
+    "time_to_first_income": "Under 30 dager",
+    "legal_scope": "EU",
+    "risk_tolerance": "Lav",
+    "deliverable": "ROI plan",
+    "target_customer": "Små SaaS/solopreneurs"
+  },
+  "artifacts": [
+    "agent_results/ROI_PLAN.md",
+    "agent_results/unknown.RESULT.json",
+    "ops/logs/AUTORUN_LOG.md"
+  ],
+  "next": {
+    "suggested_job_type": "AUTOGEN",
+    "suggested_goal": "Generate next 3 repo actions based on ROI_PLAN"
+  }
+}
