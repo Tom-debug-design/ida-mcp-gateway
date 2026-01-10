@@ -2,7 +2,7 @@ name: IDA Outbox Runner
 
 on:
   schedule:
-    - cron: "*/10 * * * *"   # hvert 10. minutt
+    - cron: "*/10 * * * *" # hvert 10. minutt
   workflow_dispatch: {}
 
 permissions:
@@ -61,47 +61,21 @@ jobs:
         run: |
           python -m worker.task_router
 
-      - name: Commit results back (safe)
+      - name: Commit results back (no rebase, safe)
         run: |
           set -e
 
           git config user.name "ida-outbox-bot"
           git config user.email "ida-outbox-bot@users.noreply.github.com"
 
-          # Ingen endringer? ferdig.
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "No changes to commit."
-            exit 0
-          fi
-
-          # Stash før sync
-          git stash push -u -m "ida-autostash" || true
-
-          # Sync uten merge-commits
-          git pull --rebase origin main
-
-          # Tilbake med endringer
-          git stash pop || true
-
-          # Commit hvis noe finnes
           git add -A
-          if [ -z "$(git status --porcelain)" ]; then
-            echo "Nothing to commit after rebase."
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
             exit 0
           fi
 
-          git commit -m "IDA: outbox worker results" || true
+          git commit -m "IDA: outbox worker results"
 
-          # Push med retry
-          for i in 1 2 3 4 5; do
-            if git push origin HEAD:main; then
-              echo "Push succeeded."
-              exit 0
-            fi
-            echo "Push failed (attempt $i). Backing off..."
-            sleep $((i*2))
-            git pull --rebase origin main || true
-          done
-
-          echo "Push failed after retries."
-          exit 1
+          # Push direkte. Ingen rebase. Ingen pull. Ingen stash.
+          git push origin HEAD:main || git push origin HEAD:main
