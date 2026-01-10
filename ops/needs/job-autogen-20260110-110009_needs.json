@@ -1,0 +1,9 @@
+{
+  "job_file": "job-autogen-20260110-110009.json",
+  "job_type": "UNKNOWN",
+  "missing": [
+    "executor"
+  ],
+  "hint": "Ingen executor for job_type=UNKNOWN. Legg til handler i worker/task_router.py",
+  "timestamp_utc": "2026-01-10 11:08:09 UTC"
+}
