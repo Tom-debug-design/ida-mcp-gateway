@@ -1,0 +1,9 @@
+{
+  "job_file": "job-daily-20260110-062538.json",
+  "job_type": "write_result",
+  "missing": [
+    "executor"
+  ],
+  "hint": "Ingen executor for job_type=write_result. Legg til handler i worker/task_router.py",
+  "timestamp_utc": "2026-01-10 06:58:50 UTC"
+}
