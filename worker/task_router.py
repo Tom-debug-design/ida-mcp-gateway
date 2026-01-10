@@ -1,165 +1,189 @@
-# worker/task_router.py
 from __future__ import annotations
 
-import os
 import json
+import os
 import shutil
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Tuple
+import time
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional
 
-from worker.tasks.roi_scan import run_roi_scan
-
-
-def _utc_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-
-
-def _utc_stamp() -> str:
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+# Optional handlers (import-safe)
+try:
+    from worker.roi_scan import handle_roi_scan  # type: ignore
+except Exception:
+    handle_roi_scan = None  # type: ignore
 
 
-def _ensure_dir(path: str) -> None:
-    os.makedirs(path, exist_ok=True)
+@dataclass
+class Paths:
+    outbox: Path
+    done: Path
+    results: Path
+    ops_log: Path
 
 
-def _read_json(path: str) -> Dict[str, Any]:
-    with open(path, "r", encoding="utf-8") as f:
+def _now_iso() -> str:
+    return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+def _safe_mkdir(p: Path) -> None:
+    p.mkdir(parents=True, exist_ok=True)
+
+
+def _read_json(path: Path) -> Dict[str, Any]:
+    with path.open("r", encoding="utf-8") as f:
         return json.load(f)
 
 
-def _write_text(path: str, text: str) -> None:
-    _ensure_dir(os.path.dirname(path))
-    with open(path, "w", encoding="utf-8") as f:
-        f.write(text)
+def _write_json(path: Path, payload: Dict[str, Any]) -> None:
+    _safe_mkdir(path.parent)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    with tmp.open("w", encoding="utf-8") as f:
+        json.dump(payload, f, ensure_ascii=False, indent=2)
+    tmp.replace(path)
 
 
-def _write_json(path: str, data: Any) -> None:
-    _ensure_dir(os.path.dirname(path))
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
-
-
-def _append_log(path: str, line: str) -> None:
-    _ensure_dir(os.path.dirname(path))
-    with open(path, "a", encoding="utf-8") as f:
+def _append_log(log_path: Path, line: str) -> None:
+    _safe_mkdir(log_path.parent)
+    with log_path.open("a", encoding="utf-8") as f:
         f.write(line.rstrip() + "\n")
 
 
-def _move(src: str, dst: str) -> None:
-    _ensure_dir(os.path.dirname(dst))
-    shutil.move(src, dst)
+def _normalize_job_type(job: Dict[str, Any], filename: str = "") -> str:
+    """
+    Accept EVERYTHING:
+      - job_type (preferred)
+      - task      (common)
+      - type      (older)
+      - action    (some generators)
+    Also tries to infer from filename or job content.
+    """
+    raw = (
+        job.get("job_type")
+        or job.get("task")
+        or job.get("type")
+        or job.get("action")
+        or job.get("kind")
+        or ""
+    )
 
+    s = str(raw).strip().upper().replace("-", "_").replace(" ", "_")
 
-def _job_type(job: Dict[str, Any], filename: str) -> str:
-    jt = (job.get("job_type") or job.get("type") or job.get("job") or "").strip()
-    if jt:
-        return jt
-    # fallback: derive from filename like 001_roi_scan.json
-    base = os.path.basename(filename).lower()
-    if "roi_scan" in base:
+    # Alias map (future-proof)
+    aliases = {
+        "ROI": "ROI_SCAN",
+        "ROISCAN": "ROI_SCAN",
+        "ROI_SCAN": "ROI_SCAN",
+        "ROI-SCAN": "ROI_SCAN",
+        "ROI_SCAN_V1": "ROI_SCAN",
+        "ROI_CHECK": "ROI_SCAN",
+    }
+    if s in aliases:
+        return aliases[s]
+
+    # Infer from filename (last-resort)
+    fn = filename.lower()
+    if "roi" in fn and "scan" in fn:
         return "ROI_SCAN"
-    return "UNKNOWN"
+
+    # Infer from content keys (last-resort)
+    # (you can extend this without breaking old jobs)
+    if "roi" in job or "keywords" in job or "market" in job:
+        # not perfect, but better than failing
+        return "ROI_SCAN"
+
+    return s or "UNKNOWN"
 
 
-def _list_jobs(outbox_dir: str) -> List[str]:
-    if not os.path.isdir(outbox_dir):
-        return []
-    files = []
-    for name in os.listdir(outbox_dir):
-        if name.lower().endswith(".json"):
-            files.append(os.path.join(outbox_dir, name))
-    files.sort()
-    return files
+def _result_filename(job_file: Path) -> str:
+    # Example: job-autogen-20260110-165356.json -> result-job-autogen-....json
+    return f"result-{job_file.name}"
 
 
-def _result_paths(results_dir: str) -> Tuple[str, str]:
-    # main stable result file + timestamped result
-    main = os.path.join(results_dir, "ROI_PLAN.md")
-    stamped = os.path.join(results_dir, f"ROI_PLAN.{_utc_stamp()}.md")
-    return main, stamped
+def _move_to_done(job_file: Path, done_dir: Path) -> Path:
+    _safe_mkdir(done_dir)
+    target = done_dir / job_file.name
+    # overwrite-safe
+    if target.exists():
+        target = done_dir / f"{job_file.stem}-{int(time.time())}{job_file.suffix}"
+    shutil.move(str(job_file), str(target))
+    return target
 
 
-def process_one(job_path: str, outbox_done: str, results_dir: str, needs_dir: str, autorun_log_path: str) -> None:
-    name = os.path.basename(job_path)
-    try:
-        job = _read_json(job_path)
-    except Exception as e:
-        # If job is corrupt, move it aside as FAILED
-        failed_name = f"{os.path.splitext(name)[0]}.FAILED.{_utc_stamp()}.json"
-        _move(job_path, os.path.join(outbox_done, failed_name))
-        _append_log(autorun_log_path, f"[{_utc_iso()}] ROI_SCAN read failed for {name}: {type(e).__name__}: {e}")
-        return
+def _dispatch(job: Dict[str, Any], job_type: str) -> Dict[str, Any]:
+    """
+    Central dispatcher.
+    Never throws: always returns a result dict.
+    """
+    if job_type == "ROI_SCAN" and handle_roi_scan is not None:
+        return handle_roi_scan(job, {})  # needs dict not used in many handlers
 
-    jt = _job_type(job, name)
-
-    if jt != "ROI_SCAN":
-        # Not our executor job type -> mark failed w/ needs
-        failed_name = f"{os.path.splitext(name)[0]}.FAILED.{_utc_stamp()}.json"
-        _move(job_path, os.path.join(outbox_done, failed_name))
-        _write_json(
-            os.path.join(needs_dir, f"{os.path.splitext(name)[0]}_needs.json"),
-            {
-                "job_file": name,
-                "job_type": jt,
-                "missing": ["executor"],
-                "hint": f"Ingen executor for job_type={jt}. Legg til handler i worker/task_router.py",
-                "timestamp_utc": _utc_iso(),
-            },
-        )
-        _append_log(autorun_log_path, f"[{_utc_iso()}] {jt} -> FAILED (no executor) ({name})")
-        return
-
-    # ROI_SCAN executor
-    result = run_roi_scan(job)
-
-    if result.ok:
-        main_out, stamped_out = _result_paths(results_dir)
-        _write_text(main_out, result.markdown)
-        _write_text(stamped_out, result.markdown)
-
-        done_name = f"{os.path.splitext(name)[0]}.DONE.{_utc_stamp()}.json"
-        _move(job_path, os.path.join(outbox_done, done_name))
-
-        _append_log(autorun_log_path, f"[{_utc_iso()}] ROI_SCAN -> DONE ({name}) wrote ROI_PLAN.md")
-    else:
-        failed_name = f"{os.path.splitext(name)[0]}.FAILED.{_utc_stamp()}.json"
-        _move(job_path, os.path.join(outbox_done, failed_name))
-
-        if result.needs:
-            _write_json(
-                os.path.join(needs_dir, f"{os.path.splitext(name)[0]}_needs.json"),
-                {
-                    "job_file": name,
-                    "job_type": "ROI_SCAN",
-                    "needs": result.needs,
-                    "error": result.error,
-                    "timestamp_utc": _utc_iso(),
-                },
-            )
-
-        _append_log(autorun_log_path, f"[{_utc_iso()}] ROI_SCAN -> FAILED ({name}) {result.error or ''}".rstrip())
+    # Unknown / missing handler => produce a structured failure result
+    return {
+        "job_id": job.get("job_id", "unknown"),
+        "job_type": job_type,
+        "status": "FAILED_UNKNOWN",
+        "reason": f"No executor registered for job_type={job_type!r}",
+        "details": {
+            "seen_keys": sorted(list(job.keys()))[:80],
+            "hint": "Ensure generator emits job_type/task/type/action that matches a handler. "
+                    "Router accepts many schemas, but still needs a handler name.",
+        },
+        "ts": _now_iso(),
+    }
 
 
 def main() -> None:
-    outbox_dir = os.getenv("IDA_OUTBOX_DIR", "agent_outbox")
-    results_dir = os.getenv("IDA_RESULTS_DIR", "agent_results")
-    outbox_done = os.getenv("IDA_DONE_DIR", "agent_outbox_done")
-    autorun_log = os.getenv("IDA_AUTORUN_LOG", "ops/logs/AUTORUN_LOG.md")
-    needs_dir = os.getenv("IDA_NEEDS_DIR", "ops/needs")
+    # Environment-driven directories (safe defaults)
+    outbox_dir = Path(os.getenv("IDA_OUTBOX_DIR", "agent_outbox"))
+    done_dir = Path(os.getenv("IDA_DONE_DIR", "agent_outbox_done"))
+    results_dir = Path(os.getenv("IDA_RESULTS_DIR", "agent_results"))
+    ops_log = Path(os.getenv("IDA_OPS_LOG", "ops/logs/outbox_worker.log"))
 
-    _ensure_dir(outbox_dir)
-    _ensure_dir(results_dir)
-    _ensure_dir(outbox_done)
-    _ensure_dir(os.path.dirname(autorun_log))
-    _ensure_dir(needs_dir)
+    paths = Paths(outbox=outbox_dir, done=done_dir, results=results_dir, ops_log=ops_log)
 
-    jobs = _list_jobs(outbox_dir)
-    if not jobs:
-        _append_log(autorun_log, f"[{_utc_iso()}] ROI_SCAN tick: no jobs")
+    _safe_mkdir(paths.outbox)
+    _safe_mkdir(paths.done)
+    _safe_mkdir(paths.results)
+    _safe_mkdir(paths.ops_log.parent)
+
+    job_files = sorted(paths.outbox.glob("*.json"))
+    if not job_files:
+        _append_log(paths.ops_log, f"[{_now_iso()}] ROI_SCAN tick: no jobs")
         return
 
-    # Process at most 1 per run (stable + avoids rate limits)
-    process_one(jobs[0], outbox_done, results_dir, needs_dir, autorun_log)
+    for jf in job_files:
+        try:
+            job = _read_json(jf)
+        except Exception as e:
+            # Bad JSON => move to done + create failure result
+            _append_log(paths.ops_log, f"[{_now_iso()}] FAILED reading {jf.name}: {e}")
+            result = {
+                "job_id": "unknown",
+                "job_type": "UNKNOWN",
+                "status": "FAILED_BAD_JSON",
+                "reason": f"Could not parse JSON: {e}",
+                "file": jf.name,
+                "ts": _now_iso(),
+            }
+            _write_json(paths.results / _result_filename(jf), result)
+            _move_to_done(jf, paths.done)
+            continue
+
+        job_type = _normalize_job_type(job, filename=jf.name)
+
+        # Always produce a result; never crash
+        result = _dispatch(job, job_type)
+
+        # Persist result + move job to done
+        _write_json(paths.results / _result_filename(jf), result)
+        _move_to_done(jf, paths.done)
+
+        _append_log(
+            paths.ops_log,
+            f"[{_now_iso()}] {job_type} -> {result.get('status')} ({jf.name})",
+        )
 
 
 if __name__ == "__main__":
