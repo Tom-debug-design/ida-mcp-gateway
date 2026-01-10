@@ -58,3 +58,4 @@
 20260107-193157 | no_jobs
 20260107-195224 | processed | job-autogen-20260107-194733.json | job_id=6e1e629a19 | type=general_insight | openai_ok=True
 [2026-01-10T20:31:44Z] ROI_SCAN -> SUCCESS (job-autogen-20260110-202918.json)
+[2026-01-10T20:32:50Z] ROI_SCAN tick: no jobs
