@@ -1,0 +1,14 @@
+{
+  "task": "CONTENT_TASK",
+  "title": "Hvordan tjene penger med AI-automatiserte jobber",
+  "instructions": [
+    "Write a concrete, actionable guide",
+    "No hype, no selling AI",
+    "Explain real monetization paths",
+    "End with clear next steps"
+  ],
+  "output": {
+    "type": "markdown",
+    "path": "docs/guides/hvordan-tjene-penger-med-ai-jobber.md"
+  }
+}
