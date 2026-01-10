@@ -1,22 +1,23 @@
-name: IDA Outbox Executor
+name: IDA Outbox Runner
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/10 * * * *" # hvert 10. minutt
+  workflow_dispatch: {}
 
 permissions:
   contents: write
 
 concurrency:
-  group: ida-outbox-executor
-  cancel-in-progress: false
+  group: ida-outbox-runner
+  cancel-in-progress: true
 
 jobs:
-  run-outbox:
+  run_outbox:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout (full history)
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -30,31 +31,51 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install requests
 
-      - name: Run outbox runner
+      - name: Verify imports (hard fail if missing)
+        run: |
+          python -c "import worker.task_router; print('OK: worker.task_router import')"
+
+      - name: Debug list outbox
+        run: |
+          echo "== agent_outbox =="
+          ls -la agent_outbox || true
+          echo "== agent_outbox_done =="
+          ls -la agent_outbox_done || true
+          echo "== agent_results =="
+          ls -la agent_results || true
+          echo "== ops/logs =="
+          ls -la ops/logs || true
+          echo "== ops/needs =="
+          ls -la ops/needs || true
+
+      - name: Run outbox worker (REAL work)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          IDA_OUTBOX_DIR: agent_outbox
+          IDA_RESULTS_DIR: agent_results
+          IDA_DONE_DIR: agent_outbox_done
+          IDA_OPS_LOG: ops/logs/outbox_worker.log
+        run: |
+          python -m worker.task_router
+
+      - name: Commit results back (no rebase, safe)
         run: |
           set -e
-          python tools/outbox_runner.py
 
-      - name: Commit results back (safe rebase)
-        shell: bash
-        run: |
-          set -e
+          git config user.name "ida-outbox-bot"
+          git config user.email "ida-outbox-bot@users.noreply.github.com"
 
-          git config user.name "ida-autopilot"
-          git config user.email "ida-autopilot@users.noreply.github.com"
-
-          # Sync first to avoid non-fast-forward
-          git fetch origin main
-          git rebase origin/main || (git rebase --abort && git pull --rebase origin main)
-
-          # Stage only expected folders
-          git add agent_outbox agent_results ops || true
+          git add -A
 
           if git diff --cached --quiet; then
-            echo "No changes to commit."
+            echo "No changes to commit"
             exit 0
           fi
 
-          git commit -m "IDA v2: write_result output"
-          git push origin HEAD:main
+          git commit -m "IDA: outbox worker results"
+
+          # Push direkte. Ingen rebase. Ingen pull. Ingen stash.
+          git push origin HEAD:main || git push origin HEAD:main
