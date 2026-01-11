@@ -50,9 +50,9 @@ jobs:
           echo "== ops/needs =="
           ls -la ops/needs || true
 
-      # Viktig: Dette steget skal ALDRI drepe workflowen selv om en jobb feiler.
-      # FAILED er et resultat (data), ikke en "pipeline crash".
+      # IDIOTSIKKERT: Dette steget kan feile (exit code 1) uten at workflowen stopper.
       - name: Run outbox worker (REAL work)
+        continue-on-error: true
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
@@ -61,16 +61,17 @@ jobs:
           IDA_DONE_DIR: agent_outbox_done
           IDA_OPS_LOG: ops/logs/outbox_worker.log
         run: |
-          python -m worker.task_router || true
+          python -m worker.task_router
 
-      - name: Commit results back (no rebase, safe)
+      # Kjør ALLTID, selv om worker feilet.
+      - name: Commit results back (safe)
+        if: always()
         run: |
           set -e
 
           git config user.name "ida-outbox-bot"
           git config user.email "ida-outbox-bot@users.noreply.github.com"
 
-          # Hvis ingen endringer -> ferdig
           if [ -z "$(git status --porcelain)" ]; then
             echo "No changes to commit."
             exit 0
@@ -78,7 +79,6 @@ jobs:
 
           git add -A
 
-          # Hvis fortsatt ingenting (paranoia) -> ferdig
           if [ -z "$(git status --porcelain)" ]; then
             echo "Nothing to commit after add."
             exit 0
@@ -86,7 +86,6 @@ jobs:
 
           git commit -m "IDA: outbox worker results" || true
 
-          # Push med retry (ingen rebase, ingen merge-commit)
           for i in 1 2 3 4 5; do
             if git push origin HEAD:main; then
               echo "Push succeeded."
