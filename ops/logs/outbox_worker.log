@@ -104,3 +104,48 @@
 2026-01-11 15:29:15,139 | WARNING | Max jobs per run reached (20). Stop.
 2026-01-11 15:29:15,139 | INFO | Processed jobs this tick: 20
 2026-01-11 15:29:15,139 | INFO | === task_router tick end ===
+2026-01-11 15:30:24,452 | INFO | === task_router tick start ===
+2026-01-11 15:30:24,452 | INFO | OUTBOX=agent_outbox DONE=agent_outbox_done RESULTS=agent_results
+2026-01-11 15:30:24,453 | INFO | Picked job: job-autogen-20260111-053030.json task=ROI_SCAN
+2026-01-11 15:30:24,455 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-053030.FAILED_executor_error.20260111T153024Z.json
+2026-01-11 15:30:24,555 | INFO | Picked job: job-autogen-20260110-235747.json task=ROI_SCAN
+2026-01-11 15:30:24,556 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260110-235747.FAILED_executor_error.20260111T153024Z.json
+2026-01-11 15:30:24,656 | INFO | Picked job: job-autogen-20260110-215627.json task=ROI_SCAN
+2026-01-11 15:30:24,657 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260110-215627.FAILED_executor_error.20260111T153024Z.json
+2026-01-11 15:30:24,757 | INFO | Picked job: job-autogen-20260110-232805.json task=ROI_SCAN
+2026-01-11 15:30:24,758 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260110-232805.FAILED_executor_error.20260111T153024Z.json
+2026-01-11 15:30:24,859 | INFO | Picked job: job-autogen-20260110-222825.json task=ROI_SCAN
+2026-01-11 15:30:24,859 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260110-222825.FAILED_executor_error.20260111T153024Z.json
+2026-01-11 15:30:24,960 | INFO | Picked job: job-autogen-20260111-135250.json task=ROI_SCAN
+2026-01-11 15:30:24,960 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-135250.FAILED_executor_error.20260111T153024Z.json
+2026-01-11 15:30:25,061 | INFO | Picked job: job-autogen-20260111-141919.json task=ROI_SCAN
+2026-01-11 15:30:25,062 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-141919.FAILED_executor_error.20260111T153025Z.json
+2026-01-11 15:30:25,162 | INFO | Picked job: job-autogen-20260111-145316.json task=ROI_SCAN
+2026-01-11 15:30:25,163 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-145316.FAILED_executor_error.20260111T153025Z.json
+2026-01-11 15:30:25,263 | INFO | Picked job: job-autogen-20260111-152038.json task=ROI_SCAN
+2026-01-11 15:30:25,264 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-152038.FAILED_executor_error.20260111T153025Z.json
+2026-01-11 15:30:25,364 | INFO | Picked job: job-autogen-20260111-133628.json task=ROI_SCAN
+2026-01-11 15:30:25,365 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-133628.FAILED_executor_error.20260111T153025Z.json
+2026-01-11 15:30:25,465 | INFO | Picked job: job-autogen-20260111-144018.json task=ROI_SCAN
+2026-01-11 15:30:25,466 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-144018.FAILED_executor_error.20260111T153025Z.json
+2026-01-11 15:30:25,566 | INFO | Picked job: job-autogen-20260111-055127.json task=ROI_SCAN
+2026-01-11 15:30:25,567 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-055127.FAILED_executor_error.20260111T153025Z.json
+2026-01-11 15:30:25,667 | INFO | Picked job: job-autogen-20260111-111132.json task=ROI_SCAN
+2026-01-11 15:30:25,668 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-111132.FAILED_executor_error.20260111T153025Z.json
+2026-01-11 15:30:25,768 | INFO | Picked job: job-daily-20260111-062633.json task=UNKNOWN
+2026-01-11 15:30:25,769 | WARNING | Fallback wrote result: agent_results/UNKNOWN_TASK_job-daily-20260111-062633_20260111T153025Z.md
+2026-01-11 15:30:25,769 | WARNING | UNKNOWN -> FAILED_unknown_task moved to job-daily-20260111-062633.FAILED_unknown_task.20260111T153025Z.json
+2026-01-11 15:30:25,869 | INFO | Picked job: job-autogen-20260111-074406.json task=ROI_SCAN
+2026-01-11 15:30:25,870 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-074406.FAILED_executor_error.20260111T153025Z.json
+2026-01-11 15:30:25,970 | INFO | Picked job: job-autogen-20260111-065609.json task=ROI_SCAN
+2026-01-11 15:30:25,971 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-065609.FAILED_executor_error.20260111T153025Z.json
+2026-01-11 15:30:26,072 | INFO | Picked job: job-autogen-20260111-115710.json task=ROI_SCAN
+2026-01-11 15:30:26,072 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-115710.FAILED_executor_error.20260111T153026Z.json
+2026-01-11 15:30:26,173 | INFO | Picked job: job-autogen-20260111-105008.json task=ROI_SCAN
+2026-01-11 15:30:26,173 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-105008.FAILED_executor_error.20260111T153026Z.json
+2026-01-11 15:30:26,274 | INFO | Picked job: job-autogen-20260111-075646.json task=ROI_SCAN
+2026-01-11 15:30:26,274 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-075646.FAILED_executor_error.20260111T153026Z.json
+2026-01-11 15:30:26,375 | INFO | Picked job: job-autogen-20260111-125743.json task=ROI_SCAN
+2026-01-11 15:30:26,375 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-125743.FAILED_executor_error.20260111T153026Z.json
+2026-01-11 15:30:26,476 | INFO | Processed jobs this tick: 20
+2026-01-11 15:30:26,476 | INFO | === task_router tick end ===
