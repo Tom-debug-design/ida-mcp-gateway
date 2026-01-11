@@ -13,5 +13,11 @@
     "global markets + arbitrage opportunities",
     "news/finance intelligence engine (not just social media)",
     "3 parallel revenue engines, lowest effort first"
-  ]
+  ],
+  "_router": {
+    "time_utc": "2026-01-11 21:51:19 UTC",
+    "task": "ROI_SCAN",
+    "status": "DONE",
+    "note": "ROI_SCAN executed (no-arg)."
+  }
 }
