@@ -1,113 +1,100 @@
 name: IDA Outbox Runner
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - "agent_outbox/**"
-      - "tools/**"
-      - ".github/workflows/ida_outbox.yml"
-      - "requirements.txt"
-  workflow_dispatch:
   schedule:
-    - cron: "*/5 * * * *"  # A1: poll hvert 5. min
+    - cron: "*/10 * * * *" # hvert 10. minutt
+  workflow_dispatch: {}
 
 permissions:
   contents: write
 
 concurrency:
-  group: ida-outbox-main
-  cancel-in-progress: false
+  group: ida-outbox-runner
+  cancel-in-progress: true
 
 jobs:
-  run:
+  run_outbox:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
 
     steps:
-      - name: Checkout
+      - name: Checkout (full history)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Setup Python
+      - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      - name: Install deps (requirements.txt)
+      - name: Install deps
         run: |
-          set -e
-          python -V
-          python -m pip --version
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-            python -m pip install -r requirements.txt
-          else
-            echo "No requirements.txt found - skipping install"
-          fi
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          pip install requests
 
       - name: Verify imports (hard fail if missing)
         run: |
-          set -e
-          python -c "import bs4; print('bs4 OK')"
-          python -c "import requests; print('requests OK')"
+          python -c "import worker.task_router; print('OK: worker.task_router import')"
 
       - name: Debug list outbox
         run: |
-          set -e
-          echo "== agent_outbox contents =="
+          echo "== agent_outbox =="
           ls -la agent_outbox || true
-          echo "== JSON jobs =="
-          ls -la agent_outbox/*.json 2>/dev/null || true
+          echo "== agent_outbox_done =="
+          ls -la agent_outbox_done || true
+          echo "== agent_results =="
+          ls -la agent_results || true
+          echo "== ops/logs =="
+          ls -la ops/logs || true
+          echo "== ops/needs =="
+          ls -la ops/needs || true
 
-      - name: Run outbox runner
+      # Viktig: Dette steget skal ALDRI drepe workflowen selv om en jobb feiler.
+      # FAILED er et resultat (data), ikke en "pipeline crash".
+      - name: Run outbox worker (REAL work)
         env:
-          PYTHONUNBUFFERED: "1"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
+          IDA_OUTBOX_DIR: agent_outbox
+          IDA_RESULTS_DIR: agent_results
+          IDA_DONE_DIR: agent_outbox_done
+          IDA_OPS_LOG: ops/logs/outbox_worker.log
         run: |
-          set -e
-          python tools/outbox_runner.py
+          python -m worker.task_router || true
 
-      - name: Commit results back (safe)
-        env:
-          GIT_AUTHOR_NAME: ida-outbox-bot
-          GIT_AUTHOR_EMAIL: ida-outbox-bot@users.noreply.github.com
-          GIT_COMMITTER_NAME: ida-outbox-bot
-          GIT_COMMITTER_EMAIL: ida-outbox-bot@users.noreply.github.com
+      - name: Commit results back (no rebase, safe)
         run: |
           set -e
 
           git config user.name "ida-outbox-bot"
           git config user.email "ida-outbox-bot@users.noreply.github.com"
 
-          if git diff --quiet && git diff --cached --quiet; then
+          # Hvis ingen endringer -> ferdig
+          if [ -z "$(git status --porcelain)" ]; then
             echo "No changes to commit."
             exit 0
           fi
 
+          git add -A
+
+          # Hvis fortsatt ingenting (paranoia) -> ferdig
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Nothing to commit after add."
+            exit 0
+          fi
+
+          git commit -m "IDA: outbox worker results" || true
+
+          # Push med retry (ingen rebase, ingen merge-commit)
           for i in 1 2 3 4 5; do
-            echo "Attempt $i: syncing with origin/main"
-            git fetch origin main
-            git pull --rebase origin main || true
-
-            git add -A
-
-            if git diff --cached --quiet; then
-              echo "No staged changes after rebase."
-              exit 0
-            fi
-
-            git commit -m "IDA: outbox tick" || true
-
-            echo "Attempt $i: pushing..."
             if git push origin HEAD:main; then
               echo "Push succeeded."
               exit 0
             fi
-
-            echo "Push failed, backing off..."
-            sleep $((i * 2))
+            echo "Push failed (attempt $i). Backing off..."
+            sleep $((i*2))
           done
 
-          echo "ERROR: push failed after retries"
+          echo "Push failed after retries."
           exit 1
