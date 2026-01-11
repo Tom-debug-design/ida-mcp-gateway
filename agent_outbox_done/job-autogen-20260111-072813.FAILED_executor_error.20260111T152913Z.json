@@ -13,5 +13,11 @@
     "global markets + arbitrage opportunities",
     "news/finance intelligence engine (not just social media)",
     "3 parallel revenue engines, lowest effort first"
-  ]
+  ],
+  "_router": {
+    "time_utc": "2026-01-11 15:29:13 UTC",
+    "task": "ROI_SCAN",
+    "status": "FAILED_executor_error",
+    "note": "ROI_SCAN executor import failed: roi_scan: no run_roi_scan/main/run found | result=TASK_FAILED_ROI_SCAN_job-autogen-20260111-072813_20260111T152913Z.md"
+  }
 }

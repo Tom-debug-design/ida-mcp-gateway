@@ -1,0 +1,23 @@
+{
+  "task": "ROI_SCAN",
+  "rules": [
+    "No selling IDA",
+    "No 'published/committed' claims without SHA+link",
+    "Output must be concrete repo actions (files/paths), not ideas"
+  ],
+  "deliverables": [
+    "agent_results/ROI_PLAN.md",
+    "ops/logs/AUTORUN_LOG.md"
+  ],
+  "focus": [
+    "global markets + arbitrage opportunities",
+    "news/finance intelligence engine (not just social media)",
+    "3 parallel revenue engines, lowest effort first"
+  ],
+  "_router": {
+    "time_utc": "2026-01-11 15:29:13 UTC",
+    "task": "ROI_SCAN",
+    "status": "FAILED_executor_error",
+    "note": "ROI_SCAN executor import failed: roi_scan: no run_roi_scan/main/run found | result=TASK_FAILED_ROI_SCAN_job-autogen-20260110-204707_20260111T152913Z.md"
+  }
+}

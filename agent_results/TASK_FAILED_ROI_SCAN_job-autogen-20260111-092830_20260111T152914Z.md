@@ -1,3 +1,14 @@
+# TASK FAILED
+
+- time: 2026-01-11 15:29:14 UTC
+- task: `ROI_SCAN`
+- job: `job-autogen-20260111-092830.json`
+
+## Message
+ROI_SCAN executor import failed: roi_scan: no run_roi_scan/main/run found
+
+## Raw job JSON
+```json
 {
   "task": "ROI_SCAN",
   "rules": [
@@ -15,3 +26,4 @@
     "3 parallel revenue engines, lowest effort first"
   ]
 }
+```
