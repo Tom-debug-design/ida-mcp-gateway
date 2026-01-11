@@ -183,3 +183,9 @@
 2026-01-11 16:40:52,942 | INFO | OUTBOX=agent_outbox DONE=agent_outbox_done RESULTS=agent_results
 2026-01-11 16:40:52,942 | INFO | No jobs in outbox.
 2026-01-11 16:40:52,942 | INFO | === task_router tick end ===
+2026-01-11 16:51:24,562 | INFO | === task_router tick start ===
+2026-01-11 16:51:24,562 | INFO | OUTBOX=agent_outbox DONE=agent_outbox_done RESULTS=agent_results
+2026-01-11 16:51:24,562 | INFO | Picked job: job-autogen-20260111-164617.json task=ROI_SCAN
+2026-01-11 16:51:24,564 | ERROR | ROI_SCAN -> FAILED_executor_error moved to job-autogen-20260111-164617.FAILED_executor_error.20260111T165124Z.json
+2026-01-11 16:51:24,664 | INFO | Processed jobs this tick: 1
+2026-01-11 16:51:24,665 | INFO | === task_router tick end ===
