@@ -2752,3 +2752,7 @@
 2026-01-16 06:51:15,093 | WARNING | UNKNOWN -> FAILED_unknown_task moved to job-daily-20260116-062909.FAILED_unknown_task.20260116T065115Z.json
 2026-01-16 06:51:15,193 | INFO | Processed jobs this tick: 2
 2026-01-16 06:51:15,193 | INFO | === task_router tick end ===
+2026-01-16 06:51:55,943 | INFO | === task_router tick start ===
+2026-01-16 06:51:55,943 | INFO | OUTBOX=agent_outbox DONE=agent_outbox_done RESULTS=agent_results
+2026-01-16 06:51:55,944 | INFO | No jobs in outbox.
+2026-01-16 06:51:55,944 | INFO | === task_router tick end ===
