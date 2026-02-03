@@ -1,7 +1,7 @@
 # ROI Plan — API resale
 
 Job ID: unknown  
-Generated: 2026-02-03T10:28:31Z
+Generated: 2026-02-03T11:06:16Z
 
 ## Input
 - Goal: Lag ROI-plan som kan gi inntekt raskt
