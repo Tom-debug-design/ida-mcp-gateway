@@ -1,0 +1,6 @@
+{
+  "id": "daily-report",
+  "type": "write_result",
+  "output_path": "DAILY.md",
+  "content": "# DAILY\n\n- date_utc: {{DATE_UTC}}\n- status: alive\n\n## Summary\n- outbox_jobs: {{OUTBOX_COUNT}}\n- last_run: {{LAST_RUN_UTC}}\n\n## Notes\n- Auto-generated daily marker.\n"
+}
