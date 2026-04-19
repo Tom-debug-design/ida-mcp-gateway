@@ -34321,3 +34321,7 @@
 2026-04-19 12:30:25,964 | INFO | ROI_SCAN -> DONE moved to job-autogen-20260419-122649.DONE.20260419T123025Z.json
 2026-04-19 12:30:26,064 | INFO | Processed jobs this tick: 1
 2026-04-19 12:30:26,065 | INFO | === task_router tick end ===
+2026-04-19 12:31:20,648 | INFO | === task_router tick start ===
+2026-04-19 12:31:20,649 | INFO | OUTBOX=agent_outbox DONE=agent_outbox_done RESULTS=agent_results
+2026-04-19 12:31:20,649 | INFO | No jobs in outbox.
+2026-04-19 12:31:20,649 | INFO | === task_router tick end ===
