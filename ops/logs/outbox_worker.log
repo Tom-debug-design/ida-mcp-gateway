@@ -35090,3 +35090,10 @@
 2026-04-23 07:07:39,415 | INFO | OUTBOX=agent_outbox DONE=agent_outbox_done RESULTS=agent_results
 2026-04-23 07:07:39,415 | INFO | No jobs in outbox.
 2026-04-23 07:07:39,415 | INFO | === task_router tick end ===
+2026-04-23 08:15:44,902 | INFO | === task_router tick start ===
+2026-04-23 08:15:44,903 | INFO | OUTBOX=agent_outbox DONE=agent_outbox_done RESULTS=agent_results
+2026-04-23 08:15:44,903 | INFO | Picked job: job-daily-20260423-074516.json task=UNKNOWN
+2026-04-23 08:15:44,903 | WARNING | Fallback wrote result: agent_results/UNKNOWN_TASK_job-daily-20260423-074516_20260423T081544Z.md
+2026-04-23 08:15:44,904 | WARNING | UNKNOWN -> FAILED_unknown_task moved to job-daily-20260423-074516.FAILED_unknown_task.20260423T081544Z.json
+2026-04-23 08:15:45,004 | INFO | Processed jobs this tick: 1
+2026-04-23 08:15:45,004 | INFO | === task_router tick end ===
