@@ -1,0 +1,12 @@
+{
+  "id": "daily-report",
+  "type": "write_result",
+  "output_path": "DAILY.md",
+  "content": "# DAILY\n\n- date_utc: {{DATE_UTC}}\n- status: alive\n\n## Summary\n- outbox_jobs: {{OUTBOX_COUNT}}\n- last_run: {{LAST_RUN_UTC}}\n\n## Notes\n- Auto-generated daily marker.\n",
+  "_router": {
+    "time_utc": "2026-04-29 09:21:50 UTC",
+    "task": "UNKNOWN",
+    "status": "FAILED_unknown_task",
+    "note": "No executor mapping for task=UNKNOWN | result=UNKNOWN_TASK_job-daily-20260429-080957_20260429T092150Z.md"
+  }
+}
