@@ -44112,3 +44112,14 @@
 2026-07-07 08:42:53,831 | INFO | ROI_SCAN -> DONE moved to job-autogen-20260707-054644.DONE.20260707T084253Z.json
 2026-07-07 08:42:53,931 | INFO | Processed jobs this tick: 1
 2026-07-07 08:42:53,931 | INFO | === task_router tick end ===
+2026-07-07 11:30:59,232 | INFO | === task_router tick start ===
+2026-07-07 11:30:59,232 | INFO | OUTBOX=agent_outbox DONE=agent_outbox_done RESULTS=agent_results
+2026-07-07 11:30:59,233 | INFO | Picked job: job-daily-20260707-093414.json task=UNKNOWN
+2026-07-07 11:30:59,233 | WARNING | Fallback wrote result: agent_results/UNKNOWN_TASK_job-daily-20260707-093414_20260707T113059Z.md
+2026-07-07 11:30:59,233 | WARNING | UNKNOWN -> FAILED_unknown_task moved to job-daily-20260707-093414.FAILED_unknown_task.20260707T113059Z.json
+2026-07-07 11:30:59,334 | INFO | Picked job: job-autogen-20260707-085645.json task=ROI_SCAN
+2026-07-07T11:30:59Z [INFO] ROI_SCAN job_id=unknown start
+2026-07-07T11:30:59Z [INFO] ROI_SCAN job_id=unknown wrote agent_results/ROI_PLAN.md
+2026-07-07 11:30:59,337 | INFO | ROI_SCAN -> DONE moved to job-autogen-20260707-085645.DONE.20260707T113059Z.json
+2026-07-07 11:30:59,437 | INFO | Processed jobs this tick: 2
+2026-07-07 11:30:59,437 | INFO | === task_router tick end ===
