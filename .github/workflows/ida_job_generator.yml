@@ -2,50 +2,60 @@ name: IDA Job Generator (A1)
 
 on:
   schedule:
-    - cron: "*/5 * * * *"   # hver 5. minutt
+    - cron: "*/5 * * * *"
   workflow_dispatch: {}
 
 permissions:
   contents: write
 
 concurrency:
-  group: ida-job-generator
+  group: ida-gateway-main-writer
   cancel-in-progress: false
 
 jobs:
   generate:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: A1 Guardrails (safe)
+      - name: A1 Guardrails
+        id: guardrails
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           mkdir -p agent_outbox ops/logs ops/flags
 
           if [ -f "ops/flags/STOP_AUTOPILOT" ]; then
-            echo "STOP_AUTOPILOT present – exiting"
+            echo "STOP_AUTOPILOT present - skipping generation"
+            echo "generate=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          PENDING=$(find agent_outbox -maxdepth 1 -type f -name "*.json" | wc -l | tr -d ' ')
-          echo "Pending jobs: $PENDING"
+          pending=$(find agent_outbox -maxdepth 1 -type f -name "*.json" | wc -l | tr -d " ")
+          echo "Pending jobs: $pending"
 
-          if [ "$PENDING" -ge 3 ]; then
-            echo "Backlog cap reached – skipping generation"
+          if [ "$pending" -ge 3 ]; then
+            echo "Backlog cap reached - skipping generation"
+            echo "generate=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-      - name: Generate job JSON into agent_outbox/
+          echo "generate=true" >> "$GITHUB_OUTPUT"
+
+      - name: Generate job and ops log
+        if: steps.guardrails.outputs.generate == 'true'
         shell: bash
         run: |
-          set -e
-          TS=$(date -u +"%Y%m%d-%H%M%S")
-          JOB="agent_outbox/job-autogen-${TS}.json"
+          set -euo pipefail
+          job_timestamp=$(date -u +"%Y%m%d-%H%M%S")
+          log_timestamp=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          job_path="agent_outbox/job-autogen-${job_timestamp}.json"
 
-          cat > "$JOB" <<'JSON'
+          cat > "$job_path" <<'JSON'
           {
             "task": "ROI_SCAN",
             "rules": [
@@ -65,49 +75,35 @@ jobs:
           }
           JSON
 
-          echo "Created $JOB"
-          ls -la agent_outbox || true
+          echo "[${log_timestamp}] A1 generated ${job_path}" >> ops/logs/AUTORUN_LOG.md
+          echo "Created ${job_path}"
 
-      - name: Commit job into repo (safe)
+      - name: Commit generated work safely
+        if: steps.guardrails.outputs.generate == 'true'
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
+
           git config user.name "ida-outbox-bot"
           git config user.email "ida-outbox-bot@users.noreply.github.com"
+          git add agent_outbox ops/logs/AUTORUN_LOG.md
 
-          git add agent_outbox/*.json ops/logs ops/flags || true
-          git commit -m "IDA A1: generate job" || { echo "Nothing to commit"; exit 0; }
+          if git diff --cached --quiet; then
+            echo "Nothing to commit"
+            exit 0
+          fi
 
-          # rebase + retry push (handles non-fast-forward)
-          for i in 1 2 3; do
-            git pull --rebase origin main || true
+          git commit -m "IDA A1: generate job"
+
+          for attempt in 1 2 3; do
+            git pull --rebase origin main
             if git push origin HEAD:main; then
-              echo "Push ok"
+              echo "Push succeeded"
               exit 0
             fi
-            echo "Push failed, retrying ($i/3) ..."
+            echo "Push attempt ${attempt}/3 failed"
             sleep 2
           done
-          echo "Push failed after retries"
+
+          echo "Push failed after 3 attempts"
           exit 1
-
-      - name: Write ops log entry
-        shell: bash
-        run: |
-          set -e
-          TS=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          echo "[$TS] A1 generated job" >> ops/logs/AUTORUN_LOG.md
-
-          git config user.name "ida-outbox-bot"
-          git config user.email "ida-outbox-bot@users.noreply.github.com"
-          git add ops/logs/AUTORUN_LOG.md || true
-          git commit -m "IDA ops: log A1 tick" || exit 0
-
-          for i in 1 2 3; do
-            git pull --rebase origin main || true
-            if git push origin HEAD:main; then
-              exit 0
-            fi
-            sleep 2
-          done
-          exit 0
