@@ -42,6 +42,19 @@ def _connect() -> sqlite3.Connection:
         )
         """
     )
+    columns = {
+        row["name"]
+        for row in connection.execute("PRAGMA table_info(execution_inbox)").fetchall()
+    }
+    migrations = {
+        "started_at": "ALTER TABLE execution_inbox ADD COLUMN started_at TEXT",
+        "finished_at": "ALTER TABLE execution_inbox ADD COLUMN finished_at TEXT",
+        "result": "ALTER TABLE execution_inbox ADD COLUMN result TEXT",
+        "error_type": "ALTER TABLE execution_inbox ADD COLUMN error_type TEXT",
+    }
+    for column, statement in migrations.items():
+        if column not in columns:
+            connection.execute(statement)
     connection.commit()
     return connection
 
