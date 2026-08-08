@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastmcp import FastMCP
 
 from execution_gateway import receive_execution
+from execution_worker import process_next_execution
 
 app = FastAPI(title="IDA MCP Gateway", version="2.0.0")
 
@@ -51,7 +52,10 @@ async def execute(
 ) -> dict[str, object]:
     body = await request.body()
     try:
-        return receive_execution(body, x_ida2_signature, idempotency_key)
+        receipt = receive_execution(body, x_ida2_signature, idempotency_key)
+        if receipt["duplicate"]:
+            return receipt
+        return {**receipt, "worker": process_next_execution()}
     except RuntimeError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except ValueError as exc:
