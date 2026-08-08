@@ -34,7 +34,11 @@ def _connect() -> sqlite3.Connection:
             idempotency_key TEXT NOT NULL UNIQUE,
             body_sha256 TEXT NOT NULL,
             status TEXT NOT NULL,
-            received_at TEXT NOT NULL
+            received_at TEXT NOT NULL,
+            started_at TEXT,
+            finished_at TEXT,
+            result TEXT,
+            error_type TEXT
         )
         """
     )
@@ -144,3 +148,80 @@ def list_inbox(limit: int = 50) -> list[dict[str, Any]]:
         item["payload"] = json.loads(item["payload"])
         result.append(item)
     return result
+
+
+def claim_next_execution() -> dict[str, Any] | None:
+    started_at = datetime.now(UTC).isoformat()
+    with _connect() as connection:
+        connection.execute("BEGIN IMMEDIATE")
+        row = connection.execute(
+            """
+            SELECT * FROM execution_inbox
+            WHERE status = 'accepted'
+            ORDER BY id ASC
+            LIMIT 1
+            """
+        ).fetchone()
+        if row is None:
+            connection.commit()
+            return None
+        cursor = connection.execute(
+            """
+            UPDATE execution_inbox
+            SET status = 'running', started_at = ?
+            WHERE id = ? AND status = 'accepted'
+            """,
+            (started_at, row["id"]),
+        )
+        if cursor.rowcount != 1:
+            connection.rollback()
+            return None
+        connection.commit()
+        claimed = connection.execute(
+            "SELECT * FROM execution_inbox WHERE id = ?",
+            (row["id"],),
+        ).fetchone()
+
+    assert claimed is not None
+    item = dict(claimed)
+    item["payload"] = json.loads(item["payload"])
+    return item
+
+
+def finish_inbox_execution(
+    inbox_id: int,
+    result: dict[str, Any],
+    *,
+    success: bool,
+    error_type: str | None = None,
+) -> dict[str, Any]:
+    status = "draft_ready" if success else "failed"
+    finished_at = datetime.now(UTC).isoformat()
+    with _connect() as connection:
+        cursor = connection.execute(
+            """
+            UPDATE execution_inbox
+            SET status = ?, finished_at = ?, result = ?, error_type = ?
+            WHERE id = ? AND status = 'running'
+            """,
+            (
+                status,
+                finished_at,
+                json.dumps(result, sort_keys=True),
+                error_type,
+                int(inbox_id),
+            ),
+        )
+        if cursor.rowcount != 1:
+            raise ValueError("inbox_execution_not_running")
+        connection.commit()
+        row = connection.execute(
+            "SELECT * FROM execution_inbox WHERE id = ?",
+            (int(inbox_id),),
+        ).fetchone()
+
+    assert row is not None
+    item = dict(row)
+    item["payload"] = json.loads(item["payload"])
+    item["result"] = json.loads(item["result"]) if item["result"] else None
+    return item
