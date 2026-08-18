@@ -51246,3 +51246,11 @@
 2026-08-18 20:09:22,129 | INFO | ROI_SCAN -> DONE moved to job-autogen-20260818-195855.DONE.20260818T200922Z.json
 2026-08-18 20:09:22,230 | INFO | Processed jobs this tick: 1
 2026-08-18 20:09:22,230 | INFO | === task_router tick end ===
+2026-08-18 20:35:55,676 | INFO | === task_router tick start ===
+2026-08-18 20:35:55,676 | INFO | OUTBOX=agent_outbox DONE=agent_outbox_done RESULTS=agent_results
+2026-08-18 20:35:55,677 | INFO | Picked job: job-autogen-20260818-203353.json task=ROI_SCAN
+2026-08-18T20:35:55Z [INFO] ROI_SCAN job_id=unknown start
+2026-08-18T20:35:55Z [INFO] ROI_SCAN job_id=unknown wrote agent_results/ROI_PLAN.md
+2026-08-18 20:35:55,679 | INFO | ROI_SCAN -> DONE moved to job-autogen-20260818-203353.DONE.20260818T203555Z.json
+2026-08-18 20:35:55,779 | INFO | Processed jobs this tick: 1
+2026-08-18 20:35:55,779 | INFO | === task_router tick end ===
